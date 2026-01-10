@@ -1,0 +1,262 @@
+import { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Layout from '@/components/layout/Layout';
+import ProductCard from '@/components/product/ProductCard';
+import { useProduct, useProducts } from '@/hooks/useProducts';
+import { useCart } from '@/contexts/CartContext';
+import { toast } from 'sonner';
+
+export default function ProductDetail() {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: product, isLoading, error } = useProduct(slug!);
+  const { data: relatedProducts } = useProducts(product?.category?.slug);
+  const { addItem } = useCart();
+  const [quantity, setQuantity] = useState(1);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-12">
+          <div className="animate-pulse">
+            <div className="h-6 bg-muted rounded w-32 mb-8" />
+            <div className="grid lg:grid-cols-2 gap-12">
+              <div className="aspect-square bg-muted rounded-2xl" />
+              <div className="space-y-4">
+                <div className="h-4 bg-muted rounded w-24" />
+                <div className="h-10 bg-muted rounded w-3/4" />
+                <div className="h-8 bg-muted rounded w-32" />
+                <div className="h-24 bg-muted rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-24 text-center">
+          <h1 className="text-2xl font-serif font-bold mb-4">Product Not Found</h1>
+          <p className="text-muted-foreground mb-8">
+            The product you're looking for doesn't exist or has been removed.
+          </p>
+          <Button asChild>
+            <Link to="/products">Browse Products</Link>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  const discount = product.compare_at_price
+    ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
+    : 0;
+
+  const handleAddToCart = () => {
+    addItem(product, quantity);
+    toast.success(`Added ${quantity} × ${product.name} to cart`);
+  };
+
+  const related = relatedProducts?.filter((p) => p.id !== product.id).slice(0, 4) || [];
+
+  return (
+    <Layout>
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        {/* Breadcrumb */}
+        <nav className="mb-8">
+          <Link
+            to="/products"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Products
+          </Link>
+        </nav>
+
+        {/* Product Details */}
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Image */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="aspect-square rounded-2xl overflow-hidden bg-secondary shadow-card">
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-8xl font-serif text-muted-foreground/30">
+                    {product.name.charAt(0)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Info */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col"
+          >
+            {/* Category */}
+            {product.category && (
+              <Link
+                to={`/products?category=${product.category.slug}`}
+                className="text-sm text-primary uppercase tracking-wider hover:underline mb-2"
+              >
+                {product.category.name}
+              </Link>
+            )}
+
+            {/* Title */}
+            <h1 className="text-3xl md:text-4xl font-serif font-bold mb-2">
+              {product.name}
+            </h1>
+
+            {/* Weight */}
+            {product.weight && (
+              <p className="text-muted-foreground mb-4">{product.weight}</p>
+            )}
+
+            {/* Price */}
+            <div className="flex items-baseline gap-3 mb-6">
+              <span className="text-3xl font-bold text-primary">
+                ₹{product.price.toFixed(0)}
+              </span>
+              {product.compare_at_price && (
+                <>
+                  <span className="text-xl text-muted-foreground line-through">
+                    ₹{product.compare_at_price.toFixed(0)}
+                  </span>
+                  <span className="px-2 py-1 bg-primary/10 text-primary text-sm font-medium rounded">
+                    {discount}% OFF
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Stock Status */}
+            <div className="mb-6">
+              {product.stock === 0 ? (
+                <span className="text-destructive font-medium">Out of Stock</span>
+              ) : product.stock <= 5 ? (
+                <span className="text-accent font-medium">
+                  Only {product.stock} left in stock!
+                </span>
+              ) : (
+                <span className="text-cardamom font-medium">In Stock</span>
+              )}
+            </div>
+
+            {/* Description */}
+            {product.description && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">About this product</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {product.description}
+                </p>
+              </div>
+            )}
+
+            {/* Ingredients */}
+            {product.ingredients && (
+              <div className="mb-6">
+                <h3 className="font-semibold mb-2">Ingredients</h3>
+                <p className="text-muted-foreground">{product.ingredients}</p>
+              </div>
+            )}
+
+            {/* Quantity & Add to Cart */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="flex items-center border border-border rounded-lg">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="p-3 hover:bg-muted transition-colors"
+                  disabled={quantity <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="px-6 text-lg font-medium min-w-[4rem] text-center">
+                  {quantity}
+                </span>
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="p-3 hover:bg-muted transition-colors"
+                  disabled={quantity >= product.stock}
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              <Button
+                onClick={handleAddToCart}
+                size="lg"
+                className="flex-1 sm:flex-none sm:min-w-[200px]"
+                disabled={product.stock === 0}
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                Add to Cart
+              </Button>
+            </div>
+
+            {/* Features */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Truck className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Free Delivery</p>
+                  <p className="text-xs text-muted-foreground">On orders ₹500+</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Fresh Packed</p>
+                  <p className="text-xs text-muted-foreground">Quality sealed</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">COD Available</p>
+                  <p className="text-xs text-muted-foreground">Pay on delivery</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Related Products */}
+        {related.length > 0 && (
+          <section className="mt-16 md:mt-24">
+            <h2 className="text-2xl md:text-3xl font-serif font-bold mb-8">
+              You May Also Like
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {related.map((product, index) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </Layout>
+  );
+}
