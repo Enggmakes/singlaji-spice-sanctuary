@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Ticket, Percent, Check, Ban } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Coupon } from '@/types/coupon';
+import {
+  fetchCoupons,
+  createCoupon,
+  toggleCouponActive,
+  deleteCoupon,
+} from '@/lib/couponService';
 import { toast } from 'sonner';
 
 interface Category {
@@ -29,8 +37,12 @@ export default function Admin() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+
   const [addingProduct, setAddingProduct] = useState(false);
+  const [addingCoupon, setAddingCoupon] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
   const [productForm, setProductForm] = useState<{
     name: string;
     price: string;
@@ -45,6 +57,22 @@ export default function Admin() {
     category_id: '',
     description: '',
     image: null,
+  });
+
+  const [couponForm, setCouponForm] = useState<{
+    code: string;
+    discount_type: 'percentage' | 'flat';
+    discount_value: string;
+    min_order_value: string;
+    max_discount: string;
+    description: string;
+  }>({
+    code: '',
+    discount_type: 'percentage',
+    discount_value: '',
+    min_order_value: '',
+    max_discount: '',
+    description: '',
   });
 
   // Guard: Only allow admin users
@@ -63,8 +91,14 @@ export default function Admin() {
     if (isAdmin) {
       fetchCategories();
       fetchProducts();
+      loadCoupons();
     }
   }, [isAdmin]);
+
+  const loadCoupons = async () => {
+    const list = await fetchCoupons();
+    setCoupons(list);
+  };
 
   const fetchCategories = async () => {
     try {
@@ -199,6 +233,77 @@ export default function Admin() {
     }
   };
 
+  // Coupon Handlers
+  const handleCreateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponForm.code.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+    if (!couponForm.discount_value || Number(couponForm.discount_value) <= 0) {
+      toast.error('Please enter a valid discount value');
+      return;
+    }
+
+    setAddingCoupon(true);
+    try {
+      await createCoupon({
+        code: couponForm.code.trim().toUpperCase(),
+        discount_type: couponForm.discount_type,
+        discount_value: Number(couponForm.discount_value),
+        min_order_value: Number(couponForm.min_order_value) || 0,
+        max_discount: couponForm.max_discount
+          ? Number(couponForm.max_discount)
+          : undefined,
+        description:
+          couponForm.description.trim() ||
+          (couponForm.discount_type === 'percentage'
+            ? `${couponForm.discount_value}% OFF`
+            : `Flat ₹${couponForm.discount_value} OFF`),
+        is_active: true,
+      });
+
+      toast.success(`Coupon '${couponForm.code.toUpperCase()}' created!`);
+      setCouponForm({
+        code: '',
+        discount_type: 'percentage',
+        discount_value: '',
+        min_order_value: '',
+        max_discount: '',
+        description: '',
+      });
+      await loadCoupons();
+    } catch (err: any) {
+      console.error('Failed to create coupon:', err);
+      toast.error(err.message || 'Failed to create coupon');
+    } finally {
+      setAddingCoupon(false);
+    }
+  };
+
+  const handleToggleCoupon = async (id: string, currentStatus: boolean) => {
+    try {
+      await toggleCouponActive(id, !currentStatus);
+      toast.success(
+        !currentStatus ? 'Coupon activated' : 'Coupon deactivated'
+      );
+      await loadCoupons();
+    } catch (err) {
+      toast.error('Failed to update coupon status');
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string, code: string) => {
+    if (!confirm(`Are you sure you want to delete coupon '${code}'?`)) return;
+    try {
+      await deleteCoupon(id);
+      toast.success(`Coupon '${code}' deleted`);
+      await loadCoupons();
+    } catch (err) {
+      toast.error('Failed to delete coupon');
+    }
+  };
+
   if (authLoading) {
     return (
       <Layout>
@@ -250,6 +355,221 @@ export default function Admin() {
                 {cat.name}
               </span>
             ))}
+          </div>
+        </section>
+
+        {/* Manage Discount Coupons (NEW) */}
+        <section className="bg-card rounded-xl p-6 shadow-card border border-border">
+          <div className="flex items-center gap-2.5 mb-6">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <Ticket className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold font-serif">
+                Discount Coupons & Promo Codes
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Create promotional discount codes for your customers (Cart & Checkout)
+              </p>
+            </div>
+          </div>
+
+          {/* Coupon Form */}
+          <form
+            onSubmit={handleCreateCoupon}
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 rounded-lg bg-muted/20 border border-border mb-6"
+          >
+            <div>
+              <Label className="text-xs font-semibold mb-1 block">
+                Coupon Code *
+              </Label>
+              <Input
+                placeholder="e.g. DIWALI20"
+                value={couponForm.code}
+                onChange={(e) =>
+                  setCouponForm((prev) => ({
+                    ...prev,
+                    code: e.target.value.toUpperCase().replace(/\s+/g, ''),
+                  }))
+                }
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold mb-1 block">
+                Discount Type *
+              </Label>
+              <select
+                className="w-full h-10 border rounded-lg px-3 py-2 bg-background text-sm text-foreground border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                value={couponForm.discount_type}
+                onChange={(e) =>
+                  setCouponForm((prev) => ({
+                    ...prev,
+                    discount_type: e.target.value as 'percentage' | 'flat',
+                  }))
+                }
+              >
+                <option value="percentage">Percentage Discount (%)</option>
+                <option value="flat">Flat Amount Discount (₹)</option>
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold mb-1 block">
+                Discount Value *
+              </Label>
+              <Input
+                type="number"
+                placeholder={
+                  couponForm.discount_type === 'percentage' ? 'e.g. 15 (for 15%)' : 'e.g. 50 (for ₹50)'
+                }
+                value={couponForm.discount_value}
+                onChange={(e) =>
+                  setCouponForm((prev) => ({
+                    ...prev,
+                    discount_value: e.target.value,
+                  }))
+                }
+                required
+                min="1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold mb-1 block">
+                Min. Order Value (₹)
+              </Label>
+              <Input
+                type="number"
+                placeholder="e.g. 499 (0 for no min)"
+                value={couponForm.min_order_value}
+                onChange={(e) =>
+                  setCouponForm((prev) => ({
+                    ...prev,
+                    min_order_value: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold mb-1 block">
+                Max Discount Cap (₹)
+              </Label>
+              <Input
+                type="number"
+                placeholder="Optional (e.g. 150)"
+                value={couponForm.max_discount}
+                disabled={couponForm.discount_type === 'flat'}
+                onChange={(e) =>
+                  setCouponForm((prev) => ({
+                    ...prev,
+                    max_discount: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold mb-1 block">
+                Offer Description
+              </Label>
+              <Input
+                placeholder="e.g. 20% OFF on all spices"
+                value={couponForm.description}
+                onChange={(e) =>
+                  setCouponForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+              />
+            </div>
+
+            <div className="sm:col-span-2 md:col-span-3 flex justify-end">
+              <Button
+                type="submit"
+                disabled={addingCoupon}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {addingCoupon ? 'Creating…' : 'Create Coupon'}
+              </Button>
+            </div>
+          </form>
+
+          {/* Existing Coupons List */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">
+              Active Coupons ({coupons.length})
+            </h3>
+            {coupons.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No coupons created yet. Use the form above to add your first promo code.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {coupons.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                      c.is_active
+                        ? 'bg-card border-border shadow-sm'
+                        : 'bg-muted/40 border-dashed border-muted text-muted-foreground opacity-60'
+                    }`}
+                  >
+                    <div className="space-y-1 min-w-0 pr-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-sm tracking-wider px-2.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                          {c.code}
+                        </span>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+                          {c.discount_type === 'percentage'
+                            ? `${c.discount_value}% OFF`
+                            : `₹${c.discount_value} OFF`}
+                        </span>
+                        {!c.is_active && (
+                          <span className="text-[10px] uppercase font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {c.description || `${c.discount_value} discount`}
+                        {c.min_order_value ? ` • Min order: ₹${c.min_order_value}` : ''}
+                        {c.max_discount ? ` • Up to ₹${c.max_discount}` : ''}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        title={c.is_active ? 'Deactivate' : 'Activate'}
+                        onClick={() => handleToggleCoupon(c.id, c.is_active)}
+                      >
+                        {c.is_active ? (
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Ban className="h-4 w-4 text-amber-600" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        title="Delete Coupon"
+                        onClick={() => handleDeleteCoupon(c.id, c.code)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
