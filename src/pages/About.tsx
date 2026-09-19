@@ -164,7 +164,7 @@ export default function About() {
               </p>
               <div className="inline-flex items-center gap-2 px-6 py-3 bg-primary/10 rounded-full">
                 <Award className="h-5 w-5 text-primary" />
-                <span className="font-medium text-primary">25+ Years of Trust</span>
+                <span className="font-medium text-primary">100% Pure & Authentic Quality</span>
               </div>
             </motion.div>
           </div>

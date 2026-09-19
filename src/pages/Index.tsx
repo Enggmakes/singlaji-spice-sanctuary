@@ -247,10 +247,6 @@ export default function Index() {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="absolute -bottom-6 -left-6 bg-card rounded-xl p-6 shadow-card">
-                <div className="text-4xl font-serif font-bold text-primary">25+</div>
-                <div className="text-sm text-muted-foreground">Years of Trust</div>
-              </div>
             </motion.div>
           </div>
         </div>
