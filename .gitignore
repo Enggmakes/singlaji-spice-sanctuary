@@ -12,6 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Temporary cpanel uploads
+publc_html/
+public_html/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

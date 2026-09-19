@@ -5,6 +5,8 @@ import { ShoppingCart, User, Menu, X, ChevronDown, LogOut, Settings } from 'luci
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCategories } from '@/hooks/useProducts';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const categories = [
+const fallbackCategories = [
   { name: 'Garam Masala', slug: 'garam-masala' },
   { name: 'Red Chilli', slug: 'red-chilli' },
   { name: 'Turmeric', slug: 'turmeric' },
@@ -26,11 +28,24 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const { user, isAdmin, signOut } = useAuth();
+  const { data: remoteCategories } = useCategories();
   const navigate = useNavigate();
 
+  const categories =
+    remoteCategories && remoteCategories.length > 0
+      ? remoteCategories
+      : fallbackCategories;
+
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    try {
+      await signOut();
+      toast.success('Signed out successfully');
+    } catch (e) {
+      console.error('Logout error:', e);
+    } finally {
+      // Hard redirect to root ensures complete cleanup of cached states
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -74,6 +89,17 @@ export default function Header() {
             >
               About Us
             </Link>
+
+            {/* Admin Panel Tab - ONLY visible to admin */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="text-primary font-semibold flex items-center gap-1.5 bg-primary/10 border border-primary/20 px-3.5 py-1.5 rounded-full hover:bg-primary/20 transition-all shadow-sm"
+              >
+                <Settings className="h-4 w-4" />
+                Admin Panel
+              </Link>
+            )}
           </nav>
 
           {/* Right Actions */}
@@ -109,19 +135,32 @@ export default function Header() {
                   <DropdownMenuItem asChild>
                     <Link to="/orders">My Orders</Link>
                   </DropdownMenuItem>
+
+                  {/* Admin link - ONLY visible to admin */}
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to="/admin" className="flex items-center gap-2">
+                        <Link
+                          to="/admin"
+                          className="flex items-center gap-2 text-primary font-semibold cursor-pointer"
+                        >
                           <Settings className="h-4 w-4" />
                           Admin Panel
                         </Link>
                       </DropdownMenuItem>
                     </>
                   )}
+
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      handleSignOut();
+                    }}
+                    onClick={handleSignOut}
+                    className="text-destructive cursor-pointer focus:text-destructive focus:bg-destructive/10"
+                  >
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </DropdownMenuItem>
@@ -189,6 +228,18 @@ export default function Header() {
                 >
                   About Us
                 </Link>
+
+                {/* Mobile Admin Link - ONLY visible to admin */}
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    className="block py-2 text-primary font-semibold flex items-center gap-2 border-t border-border mt-2 pt-3"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Settings className="h-4 w-4" />
+                    Admin Panel
+                  </Link>
+                )}
               </div>
             </motion.nav>
           )}
