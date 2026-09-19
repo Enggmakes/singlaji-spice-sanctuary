@@ -78,18 +78,18 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-3 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>Singlaji Store, Main Market, India</span>
+                <span>Singlaji Store, Nai Abadi St no. 17-18 Near uttam vihar colony Gate no. 2 Abohar</span>
               </li>
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Phone className="h-4 w-4 shrink-0" />
-                <a href="tel:+919876543210" className="hover:text-primary transition-colors">
-                  +91 98765 43210
+                <a href="tel:+918872572784" className="hover:text-primary transition-colors">
+                  +91 8872572784
                 </a>
               </li>
               <li className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 shrink-0" />
-                <a href="mailto:info@singlaji.com" className="hover:text-primary transition-colors">
-                  info@singlaji.com
+                <a href="mailto:singlaji2026@gmail.com" className="hover:text-primary transition-colors">
+                  singlaji2026@gmail.com
                 </a>
               </li>
             </ul>

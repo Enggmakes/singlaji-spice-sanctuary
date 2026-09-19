@@ -135,7 +135,7 @@ export default function Checkout() {
       `Hi! I'd like to place an order:\n\n${orderText}\n\nSubtotal: ₹${subtotal.toFixed(0)}\nShipping: ₹${shipping}\nTotal: ₹${total.toFixed(0)}\n\nName: ${formData.name}\nPhone: ${formData.phone}\nAddress: ${formData.address}, ${formData.city}, ${formData.state} - ${formData.pincode}`
     );
     
-    window.open(`https://wa.me/919876543210?text=${message}`, '_blank');
+    window.open(`https://wa.me/918872572784?text=${message}`, '_blank');
   };
 
   if (items.length === 0 && !orderPlaced) {
