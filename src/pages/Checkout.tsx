@@ -163,10 +163,21 @@ export default function Checkout() {
         orderNotes = orderNotes ? `${orderNotes} ${couponNote}` : couponNote;
       }
 
+      // Pre-generate order UUID so we don't rely on RETURNING * which can fail under RLS select policies
+      const newOrderId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              const v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+
       // Create order tied permanently to user.id
-      const { data: order, error: orderError } = await supabase
+      const { error: orderError } = await supabase
         .from('orders')
         .insert({
+          id: newOrderId,
           user_id: user.id,
           customer_name: formData.name,
           customer_phone: formData.phone,
@@ -181,16 +192,14 @@ export default function Checkout() {
           shipping,
           total: finalTotal,
           notes: orderNotes || null,
-        })
-        .select()
-        .single();
+        });
 
       if (orderError) throw orderError;
 
       // Create order items
       const orderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: item.product.id,
+        order_id: newOrderId,
+        product_id: item.product?.id || null,
         product_name: item.product.name,
         quantity: item.quantity,
         price: item.product.price,
@@ -202,29 +211,33 @@ export default function Checkout() {
 
       if (itemsError) throw itemsError;
 
-      // Update customer profile with delivery details for 1-click future checkout
+      // Update customer profile with delivery details for 1-click future checkout (non-blocking)
       try {
-        await supabase.from('profiles').upsert({
-          user_id: user.id,
-          full_name: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          pincode: formData.pincode,
-        });
+        await supabase.from('profiles').upsert(
+          {
+            user_id: user.id,
+            full_name: formData.name,
+            phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            pincode: formData.pincode,
+          },
+          { onConflict: 'user_id' }
+        );
       } catch (profErr) {
         console.warn('Profile update warning:', profErr);
       }
 
       // Success!
-      setOrderId(order.id);
+      setOrderId(newOrderId);
       setOrderPlaced(true);
       clearCart();
       toast.success('Order placed successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error placing order:', error);
-      toast.error('Failed to place order. Please try again.');
+      const errorMsg = error?.message || 'Failed to place order. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
