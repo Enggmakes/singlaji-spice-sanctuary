@@ -11,7 +11,6 @@ import {
   ExternalLink,
   MessageCircle,
   AlertCircle,
-  Printer,
   ShieldCheck,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -289,24 +288,15 @@ export default function OrderDetail() {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8 md:py-12 max-w-4xl">
-        {/* Navigation & Header */}
-        <div className="flex items-center justify-between mb-6 print:hidden">
+        {/* Navigation */}
+        <div className="mb-6">
           <Link
             to="/orders"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to My Orders
           </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="text-xs"
-          >
-            <Printer className="h-3.5 w-3.5 mr-1.5" />
-            Print Receipt
-          </Button>
         </div>
 
         {/* Status Card Banner */}
