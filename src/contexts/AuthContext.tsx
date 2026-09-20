@@ -90,6 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    // Safety fallback: Ensure auth loading is NEVER stuck true for more than 1.5 seconds
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+
     // 1. Listen for auth changes
     const {
       data: { subscription },
@@ -110,23 +115,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // 2. Initial session check
-    supabase.auth.getSession().then(async ({ data: { session: initSession } }) => {
-      setSession(initSession);
-      const currentUser = initSession?.user ?? null;
-      setUser(currentUser);
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session: initSession } }) => {
+        setSession(initSession);
+        const currentUser = initSession?.user ?? null;
+        setUser(currentUser);
 
-      if (currentUser) {
-        const adminStatus = await checkAdminRole(currentUser);
-        setIsAdmin(adminStatus);
-      } else {
-        localStorage.removeItem('singlaji_is_admin');
-        setIsAdmin(false);
-      }
+        if (currentUser) {
+          const adminStatus = await checkAdminRole(currentUser);
+          setIsAdmin(adminStatus);
+        } else {
+          localStorage.removeItem('singlaji_is_admin');
+          setIsAdmin(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('Initial session check error:', err);
+      })
+      .finally(() => {
+        clearTimeout(safetyTimer);
+        setLoading(false);
+      });
 
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -158,38 +173,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // 1. Instantly purge all auth keys from localStorage synchronously
     try {
-      // 1. Sign out locally without waiting on network
-      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-    } catch (e) {
-      console.error('Sign out error:', e);
-    } finally {
-      // 2. Wipe clean all supabase and singlaji keys from localStorage
-      try {
-        localStorage.removeItem('singlaji_is_admin');
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (
-            key &&
-            (key.startsWith('sb-') ||
-              key.includes('supabase') ||
-              key.includes('auth-token') ||
-              key.includes('singlaji'))
-          ) {
-            keysToRemove.push(key);
-          }
+      localStorage.removeItem('singlaji_is_admin');
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (
+          key &&
+          (key.startsWith('sb-') ||
+            key.includes('supabase') ||
+            key.includes('auth-token') ||
+            key.includes('singlaji'))
+        ) {
+          keysToRemove.push(key);
         }
-        keysToRemove.forEach((k) => localStorage.removeItem(k));
-      } catch (err) {
-        console.error('Failed to clean localStorage:', err);
       }
-
-      // 3. Reset state immediately
-      setUser(null);
-      setSession(null);
-      setIsAdmin(false);
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (err) {
+      console.error('Failed to clean localStorage:', err);
     }
+
+    // 2. Reset React state immediately so UI updates without waiting
+    setUser(null);
+    setSession(null);
+    setIsAdmin(false);
+    setLoading(false);
+
+    // 3. Fire remote logout in background without blocking or hanging
+    try {
+      supabase.auth.signOut().catch(() => {});
+    } catch (_) {}
   };
 
   return (

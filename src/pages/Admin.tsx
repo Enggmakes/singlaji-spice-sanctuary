@@ -156,6 +156,16 @@ export default function Admin() {
     }
   }, [user, isAdmin, authLoading, navigate]);
 
+  // Fallback safety: If auth check takes more than 1.2s and no user is found, redirect to login
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!user) {
+        navigate('/login?redirect=/admin');
+      }
+    }, 1200);
+    return () => clearTimeout(fallbackTimer);
+  }, [user, navigate]);
+
   useEffect(() => {
     if (isAdmin) {
       fetchCategories();

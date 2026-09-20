@@ -36,15 +36,19 @@ export default function Header() {
       ? remoteCategories
       : fallbackCategories;
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const handleSignOut = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     try {
-      await signOut();
       toast.success('Signed out successfully');
+      await signOut();
     } catch (e) {
       console.error('Logout error:', e);
     } finally {
       // Hard redirect to root ensures complete cleanup of cached states
-      window.location.href = '/';
+      window.location.replace('/');
     }
   };
 
@@ -158,7 +162,6 @@ export default function Header() {
                       e.preventDefault();
                       handleSignOut();
                     }}
-                    onClick={handleSignOut}
                     className="text-destructive cursor-pointer focus:text-destructive focus:bg-destructive/10"
                   >
                     <LogOut className="h-4 w-4 mr-2" />
