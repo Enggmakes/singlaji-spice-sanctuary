@@ -26,14 +26,20 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signIn(formData.email, formData.password);
+    try {
+      const { error } = await signIn(formData.email, formData.password);
 
-    if (error) {
-      toast.error(error.message || 'Failed to sign in');
+      if (error) {
+        toast.error(error.message || 'Failed to sign in');
+      } else {
+        toast.success('Welcome back!');
+        navigate(redirectPath);
+      }
+    } catch (err: any) {
+      console.error('Sign in exception:', err);
+      toast.error(err?.message || 'Failed to sign in. Please try again.');
+    } finally {
       setLoading(false);
-    } else {
-      toast.success('Welcome back!');
-      navigate(redirectPath);
     }
   };
 

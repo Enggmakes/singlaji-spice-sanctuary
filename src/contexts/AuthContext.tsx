@@ -142,19 +142,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (!error && data?.user) {
-      setUser(data.user);
-      setSession(data.session);
-      const adminStatus = await checkAdminRole(data.user);
-      setIsAdmin(adminStatus);
+      if (!error && data?.user) {
+        setUser(data.user);
+        setSession(data.session);
+        const isSyncAdmin = isUserAdminSync(data.user);
+        setIsAdmin(isSyncAdmin);
+        if (!isSyncAdmin) {
+          checkUserRolesTable(data.user.id).then((roleIsAdmin) => {
+            if (roleIsAdmin) setIsAdmin(true);
+          });
+        }
+      }
+
+      return { error };
+    } catch (err: any) {
+      console.error('Error during signIn:', err);
+      return { error: err };
     }
-
-    return { error };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
