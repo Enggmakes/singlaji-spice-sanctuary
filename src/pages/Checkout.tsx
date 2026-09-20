@@ -281,7 +281,7 @@ export default function Checkout() {
               Sign In to Place Your Order
             </h1>
             <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto mb-8">
-              To track your spices delivery live, view receipts, and manage your orders (like Amazon & Flipkart), please sign in or create an account.
+              To track your spices delivery live, view receipts, and manage your orders, please sign in or create an account.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
