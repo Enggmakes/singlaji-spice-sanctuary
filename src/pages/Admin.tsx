@@ -20,6 +20,8 @@ import {
   Eye,
   X,
   Copy,
+  Pencil,
+  Upload,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -49,6 +51,8 @@ interface Product {
   price: number;
   stock: number;
   image_url: string | null;
+  category_id?: string;
+  description?: string;
 }
 
 interface OrderItem {
@@ -149,6 +153,29 @@ export default function Admin() {
     category_id: '',
     description: '',
     image: null,
+  });
+
+  // Product Editing State
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    name: string;
+    price: string;
+    stock: string;
+    category_id: string;
+    description: string;
+    imageFile: File | null;
+    currentImageUrl: string | null;
+    previewUrl: string | null;
+  }>({
+    name: '',
+    price: '',
+    stock: '',
+    category_id: '',
+    description: '',
+    imageFile: null,
+    currentImageUrl: null,
+    previewUrl: null,
   });
 
   const [couponForm, setCouponForm] = useState<{
@@ -303,7 +330,7 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price, stock, image_url')
+        .select('id, name, price, stock, image_url, category_id, description')
         .order('created_at', { ascending: false });
       if (error) throw error;
       if (data) setProducts(data);
@@ -472,11 +499,127 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  // Helper to delete old product images from Supabase storage
+  const deleteOldProductImage = async (url: string | null) => {
+    if (!url) return;
+    try {
+      let path: string | null = null;
+      if (url.includes('/products/')) {
+        const parts = url.split('/products/');
+        if (parts.length > 1) {
+          path = parts[parts.length - 1].split('?')[0];
+        }
+      }
+      if (path) {
+        await supabase.storage.from('products').remove([path]);
+        console.log('Purged old product image from storage:', path);
+      }
+    } catch (e) {
+      console.warn('Storage delete warning:', e);
+    }
+  };
+
+  const handleOpenEditProduct = (prod: Product) => {
+    setEditingProduct(prod);
+    setEditForm({
+      name: prod.name,
+      price: prod.price.toString(),
+      stock: (prod.stock ?? 0).toString(),
+      category_id: prod.category_id || '',
+      description: prod.description || '',
+      imageFile: null,
+      currentImageUrl: prod.image_url,
+      previewUrl: null,
+    });
+  };
+
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      const preview = URL.createObjectURL(file);
+      setEditForm((prev) => ({
+        ...prev,
+        imageFile: file,
+        previewUrl: preview,
+      }));
+    }
+  };
+
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    if (!editForm.name.trim() || !editForm.price) {
+      toast.error('Product name and price are required');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      let finalImageUrl = editForm.currentImageUrl;
+
+      // 1. If a new image was chosen, upload to storage and delete old file
+      if (editForm.imageFile) {
+        const fileExt = editForm.imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}_edit.${fileExt}`;
+        const filePath = `products/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('products')
+          .upload(filePath, editForm.imageFile);
+
+        if (uploadError) {
+          console.warn('Storage image upload error:', uploadError);
+          toast.error('Image upload failed, updating text details');
+        } else {
+          const { data } = supabase.storage
+            .from('products')
+            .getPublicUrl(filePath);
+          finalImageUrl = data.publicUrl;
+
+          // Delete previous image file from database storage
+          if (editingProduct.image_url) {
+            await deleteOldProductImage(editingProduct.image_url);
+          }
+        }
+      }
+
+      // 2. Update product in database
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          name: editForm.name.trim(),
+          price: parseFloat(editForm.price),
+          stock: parseInt(editForm.stock) || 0,
+          category_id: editForm.category_id || null,
+          description: editForm.description.trim() || null,
+          image_url: finalImageUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingProduct.id);
+
+      if (updateError) throw updateError;
+
+      toast.success(`Spice "${editForm.name}" updated successfully!`);
+      setEditingProduct(null);
+      fetchProducts();
+    } catch (err: any) {
+      console.error('Failed to update product:', err);
+      toast.error(err.message || 'Failed to update product');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, imageUrl?: string | null) => {
+    if (!confirm('Are you sure you want to delete this spice product?')) return;
     try {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
+
+      // Delete image file from storage
+      if (imageUrl) {
+        await deleteOldProductImage(imageUrl);
+      }
 
       toast.success('Product deleted');
       fetchProducts();
@@ -1099,35 +1242,64 @@ export default function Admin() {
                 {products.map((prod) => (
                   <div
                     key={prod.id}
-                    className="p-4 rounded-lg bg-muted/40 border border-border flex items-center justify-between gap-4"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      handleOpenEditProduct(prod);
+                    }}
+                    className="p-4 rounded-xl bg-muted/40 border border-border flex items-center justify-between gap-4 hover:border-primary/50 transition-all cursor-pointer group select-none"
+                    title="Right-click or click pencil to edit spice details"
                   >
-                    <div className="flex items-center gap-3 overflow-hidden">
+                    <div
+                      className="flex items-center gap-3 overflow-hidden flex-1"
+                      onClick={() => handleOpenEditProduct(prod)}
+                    >
                       {prod.image_url ? (
                         <img
                           src={prod.image_url}
                           alt={prod.name}
-                          className="h-12 w-12 rounded object-cover shrink-0"
+                          className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border"
                         />
                       ) : (
-                        <div className="h-12 w-12 rounded bg-muted flex items-center justify-center font-bold text-muted-foreground shrink-0">
+                        <div className="h-12 w-12 rounded-lg bg-muted border border-border flex items-center justify-center font-bold text-muted-foreground shrink-0">
                           {prod.name.charAt(0)}
                         </div>
                       )}
                       <div className="truncate">
-                        <p className="font-semibold text-sm truncate">{prod.name}</p>
+                        <p className="font-semibold text-sm truncate text-foreground group-hover:text-primary transition-colors">
+                          {prod.name}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           ₹{prod.price} | Stock: {prod.stock}
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteProduct(prod.id)}
-                      className="text-destructive hover:bg-destructive/10 shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditProduct(prod);
+                        }}
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Edit Spice Details (Right-Click also supported)"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProduct(prod.id, prod.image_url);
+                        }}
+                        className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Delete Spice Product"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1640,6 +1812,170 @@ export default function Admin() {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* EDIT SPICE PRODUCT MODAL */}
+        {/* ============================================================== */}
+        {editingProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-card w-full max-w-lg rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <Pencil className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-bold text-lg text-foreground">
+                      Edit Spice Product
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Update details, pricing, stock, and spice image
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setEditingProduct(null)}
+                  className="h-8 w-8 rounded-full hover:bg-muted"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Modal Body / Form */}
+              <form onSubmit={handleSaveEditProduct} className="p-6 overflow-y-auto space-y-4">
+                <div>
+                  <Label className="text-xs font-semibold">Spice Name *</Label>
+                  <Input
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    placeholder="e.g. Royal Garam Masala"
+                    required
+                    className="mt-1"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-semibold">Category *</Label>
+                    <select
+                      className="w-full h-10 border rounded-md px-3 bg-background text-sm border-input mt-1"
+                      value={editForm.category_id}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, category_id: e.target.value })
+                      }
+                      required
+                    >
+                      <option value="">Select a category</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold">Price (₹) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.price}
+                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
+                      placeholder="150"
+                      required
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-semibold">Stock Quantity</Label>
+                  <Input
+                    type="number"
+                    value={editForm.stock}
+                    onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })}
+                    placeholder="50"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-semibold">Description</Label>
+                  <Textarea
+                    value={editForm.description}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, description: e.target.value })
+                    }
+                    placeholder="Describe aroma, purity, recipe usage, and specialty..."
+                    rows={3}
+                    className="mt-1"
+                  />
+                </div>
+
+                {/* Image Upload & Replacement */}
+                <div className="space-y-2 border-t border-border pt-4">
+                  <Label className="text-xs font-semibold block">Spice Product Image</Label>
+
+                  <div className="flex items-center gap-4">
+                    {editForm.previewUrl || editForm.currentImageUrl ? (
+                      <div className="relative group shrink-0">
+                        <img
+                          src={editForm.previewUrl || editForm.currentImageUrl || ''}
+                          alt="Product preview"
+                          className="h-16 w-16 rounded-xl object-cover border border-border shadow-sm"
+                        />
+                        {editForm.previewUrl && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow">
+                            New
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="h-16 w-16 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground text-xs font-medium shrink-0">
+                        No image
+                      </div>
+                    )}
+
+                    <div className="flex-1 space-y-1">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditImageChange}
+                        className="text-xs"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Select a new file to replace the current image. The old image will be permanently purged from database storage.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer / Actions */}
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingProduct(null)}
+                    disabled={savingEdit}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={savingEdit}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {savingEdit ? 'Saving Changes...' : 'Save Product Changes'}
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         )}
