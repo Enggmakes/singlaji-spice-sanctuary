@@ -1,9 +1,10 @@
 /**
  * High-Quality Client-Side Image Compressor for Singlaji Store
  * - Resizes large camera/phone photos (5MB - 25MB) down to crisp max 1400px
- * - Converts to optimized WebP at 85% visual quality (perceptually indistinguishable from uncompressed)
+ * - Converts to optimized WebP (or JPEG fallback) at 85% visual quality
  * - Decreases file size by 80% - 95% before uploading to Supabase
- * - Preserves aspect ratio and maximum sharpness
+ * - Uses URL.createObjectURL for near-zero memory overhead and instant performance
+ * - Built-in timeout safety ensures upload never hangs
  */
 
 export interface CompressionResult {
@@ -46,16 +47,73 @@ export async function compressImage(
   }
 
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
+    let resolved = false;
+    const safeResolve = (res: CompressionResult) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(res);
+      }
+    };
 
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
+    // 8-second safety timeout: fallback to original file if decoding hangs
+    const timer = setTimeout(() => {
+      safeResolve({
+        file,
+        originalSizeKB,
+        compressedSizeKB: originalSizeKB,
+        reductionPercentage: 0,
+        width: 0,
+        height: 0,
+      });
+    }, 8000);
 
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
+    let objectUrl: string | null = null;
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      clearTimeout(timer);
+      safeResolve({
+        file,
+        originalSizeKB,
+        compressedSizeKB: originalSizeKB,
+        reductionPercentage: 0,
+        width: 0,
+        height: 0,
+      });
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    img.onload = () => {
+      try {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (!width || !height) {
+          cleanup();
+          safeResolve({
+            file,
+            originalSizeKB,
+            compressedSizeKB: originalSizeKB,
+            reductionPercentage: 0,
+            width: 0,
+            height: 0,
+          });
+          return;
+        }
 
         // Proportional constraint
         if (width > maxWidth || height > maxHeight) {
@@ -74,13 +132,14 @@ export async function compressImage(
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve({
+          cleanup();
+          safeResolve({
             file,
             originalSizeKB,
             compressedSizeKB: originalSizeKB,
             reductionPercentage: 0,
-            width: img.width,
-            height: img.height,
+            width,
+            height,
           });
           return;
         }
@@ -90,47 +149,72 @@ export async function compressImage(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        canvas.toBlob(
-          (blob) => {
-            if (!blob || blob.size >= file.size) {
-              resolve({
-                file,
-                originalSizeKB,
-                compressedSizeKB: originalSizeKB,
-                reductionPercentage: 0,
-                width,
-                height,
-              });
-              return;
-            }
-
-            const compressedSizeKB = Math.round(blob.size / 1024);
-            const reductionPercentage = Math.round(
-              ((file.size - blob.size) / file.size) * 100
+        const tryExportBlob = (targetType: string, targetQuality: number, onDone: (blob: Blob | null) => void) => {
+          try {
+            canvas.toBlob(
+              (blob) => {
+                onDone(blob);
+              },
+              targetType,
+              targetQuality
             );
+          } catch {
+            onDone(null);
+          }
+        };
 
-            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
-            const optimizedFile = new File([blob], `${nameWithoutExt}.webp`, {
-              type: 'image/webp',
-              lastModified: Date.now(),
+        tryExportBlob(mimeType, quality, (blob) => {
+          // If WebP is unsupported or failed, try standard JPEG
+          if (!blob && mimeType !== 'image/jpeg') {
+            tryExportBlob('image/jpeg', quality, (fallbackBlob) => {
+              processResult(fallbackBlob, 'image/jpeg', 'jpg');
             });
+            return;
+          }
+          processResult(blob, mimeType, 'webp');
+        });
 
-            resolve({
-              file: optimizedFile,
+        const processResult = (blob: Blob | null, outputType: string, ext: string) => {
+          cleanup();
+          if (!blob || blob.size >= file.size) {
+            // Keep original if compression didn't save size or failed
+            safeResolve({
+              file,
               originalSizeKB,
-              compressedSizeKB,
-              reductionPercentage,
+              compressedSizeKB: originalSizeKB,
+              reductionPercentage: 0,
               width,
               height,
             });
-          },
-          mimeType,
-          quality
-        );
-      };
+            return;
+          }
 
-      img.onerror = () => {
-        resolve({
+          const compressedSizeKB = Math.round(blob.size / 1024);
+          const reductionPercentage = Math.round(
+            ((file.size - blob.size) / file.size) * 100
+          );
+
+          const cleanBaseName = file.name
+            .replace(/\.[^/.]+$/, '')
+            .replace(/[^a-zA-Z0-9_-]/g, '_');
+          const optimizedFile = new File([blob], `${cleanBaseName}.${ext}`, {
+            type: outputType,
+            lastModified: Date.now(),
+          });
+
+          safeResolve({
+            file: optimizedFile,
+            originalSizeKB,
+            compressedSizeKB,
+            reductionPercentage,
+            width,
+            height,
+          });
+        };
+      } catch (err) {
+        console.warn('Canvas compression error:', err);
+        cleanup();
+        safeResolve({
           file,
           originalSizeKB,
           compressedSizeKB: originalSizeKB,
@@ -138,11 +222,12 @@ export async function compressImage(
           width: 0,
           height: 0,
         });
-      };
+      }
     };
 
-    reader.onerror = () => {
-      resolve({
+    img.onerror = () => {
+      cleanup();
+      safeResolve({
         file,
         originalSizeKB,
         compressedSizeKB: originalSizeKB,
@@ -151,5 +236,7 @@ export async function compressImage(
         height: 0,
       });
     };
+
+    img.src = objectUrl;
   });
 }

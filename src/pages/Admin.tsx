@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Coupon } from '@/types/coupon';
 import {
@@ -118,6 +119,7 @@ const getStepIndex = (status: string) => {
 export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'coupons'>('orders');
 
@@ -437,6 +439,77 @@ export default function Admin() {
   };
 
   // Product Handlers
+  // Helper to delete old product images from Supabase storage
+  const deleteOldProductImage = async (url: string | null) => {
+    if (!url) return;
+    try {
+      let path: string | null = null;
+      let bucketName = 'product-images';
+
+      if (url.includes('/product-images/')) {
+        const parts = url.split('/product-images/');
+        if (parts.length > 1) {
+          path = decodeURIComponent(parts[parts.length - 1].split('?')[0]);
+          bucketName = 'product-images';
+        }
+      } else if (url.includes('/products/')) {
+        const parts = url.split('/products/');
+        if (parts.length > 1) {
+          path = decodeURIComponent(parts[parts.length - 1].split('?')[0]);
+          bucketName = 'products';
+        }
+      }
+
+      if (path) {
+        await supabase.storage.from(bucketName).remove([path]);
+        console.log(`Purged old product image from storage (${bucketName}):`, path);
+      }
+    } catch (e) {
+      console.warn('Storage delete warning:', e);
+    }
+  };
+
+  // Helper to compress and upload product images directly to 'product-images' bucket
+  const uploadImageFile = async (rawFile: File): Promise<string> => {
+    // 1. High-quality client-side compression (down to ~150KB - 300KB WebP)
+    const comp = await compressImage(rawFile);
+    const fileToUpload = comp.file;
+
+    // 2. Generate clean, unique filename directly at root of product-images bucket
+    const cleanBase = (fileToUpload.name || 'product')
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_');
+    const ext =
+      fileToUpload.name?.split('.').pop() ||
+      (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg');
+    const fileName = `${Date.now()}-${cleanBase}.${ext}`;
+
+    // 3. Upload to 'product-images' bucket
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, fileToUpload, {
+        contentType: fileToUpload.type || 'image/webp',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error to product-images:', uploadError);
+      throw new Error(`Image upload failed: ${uploadError.message || 'Storage error'}`);
+    }
+
+    // 4. Retrieve public URL
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(fileName);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve public URL for uploaded spice image');
+    }
+
+    return data.publicUrl;
+  };
+
+  // Product Handlers
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.name || !productForm.price || !productForm.category_id) {
@@ -449,26 +522,7 @@ export default function Admin() {
       let image_url = null;
 
       if (productForm.image) {
-        // High-quality automatic image compression (silent background optimization)
-        const comp = await compressImage(productForm.image);
-        const imageToUpload = comp.file;
-
-        const fileName = `${Date.now()}.webp`;
-        const filePath = `products/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('products')
-          .upload(filePath, imageToUpload, {
-            contentType: 'image/webp',
-            upsert: false,
-          });
-
-        if (!uploadError) {
-          const { data } = supabase.storage
-            .from('products')
-            .getPublicUrl(filePath);
-          image_url = data.publicUrl;
-        }
+        image_url = await uploadImageFile(productForm.image);
       }
 
       const slug =
@@ -498,31 +552,12 @@ export default function Admin() {
         image: null,
       });
       fetchProducts();
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err: any) {
       console.error('Failed to add product:', err);
       toast.error(err.message || 'Failed to add product');
     } finally {
       setAddingProduct(false);
-    }
-  };
-
-  // Helper to delete old product images from Supabase storage
-  const deleteOldProductImage = async (url: string | null) => {
-    if (!url) return;
-    try {
-      let path: string | null = null;
-      if (url.includes('/products/')) {
-        const parts = url.split('/products/');
-        if (parts.length > 1) {
-          path = parts[parts.length - 1].split('?')[0];
-        }
-      }
-      if (path) {
-        await supabase.storage.from('products').remove([path]);
-        console.log('Purged old product image from storage:', path);
-      }
-    } catch (e) {
-      console.warn('Storage delete warning:', e);
     }
   };
 
@@ -564,35 +599,13 @@ export default function Admin() {
     try {
       let finalImageUrl = editForm.currentImageUrl;
 
-      // 1. If a new image was chosen, compress, upload to storage and delete old file
+      // 1. If a new image was chosen, upload to product-images and delete old image
       if (editForm.imageFile) {
-        // High-quality automatic image compression (silent background optimization)
-        const comp = await compressImage(editForm.imageFile);
-        const imageToUpload = comp.file;
+        finalImageUrl = await uploadImageFile(editForm.imageFile);
 
-        const fileName = `${Date.now()}_edit.webp`;
-        const filePath = `products/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('products')
-          .upload(filePath, imageToUpload, {
-            contentType: 'image/webp',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.warn('Storage image upload error:', uploadError);
-          toast.error('Image upload failed, updating text details');
-        } else {
-          const { data } = supabase.storage
-            .from('products')
-            .getPublicUrl(filePath);
-          finalImageUrl = data.publicUrl;
-
-          // Delete previous image file from database storage
-          if (editingProduct.image_url) {
-            await deleteOldProductImage(editingProduct.image_url);
-          }
+        // Delete previous image file from database storage if different
+        if (editingProduct.image_url && editingProduct.image_url !== finalImageUrl) {
+          await deleteOldProductImage(editingProduct.image_url);
         }
       }
 
@@ -615,6 +628,7 @@ export default function Admin() {
       toast.success(`Spice "${editForm.name}" updated successfully!`);
       setEditingProduct(null);
       fetchProducts();
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err: any) {
       console.error('Failed to update product:', err);
       toast.error(err.message || 'Failed to update product');
@@ -636,6 +650,7 @@ export default function Admin() {
 
       toast.success('Product deleted');
       fetchProducts();
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err: any) {
       console.error('Error deleting product:', err);
       toast.error(err.message || 'Failed to delete product');
@@ -1942,7 +1957,7 @@ export default function Admin() {
                         <img
                           src={editForm.previewUrl || editForm.currentImageUrl || ''}
                           alt="Product preview"
-                          className="h-16 w-16 rounded-xl object-cover border border-border shadow-sm"
+                          className="h-20 w-20 rounded-xl object-contain bg-neutral-50 dark:bg-neutral-900 border border-border shadow-sm p-1"
                         />
                         {editForm.previewUrl && (
                           <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow">
@@ -1951,21 +1966,48 @@ export default function Admin() {
                         )}
                       </div>
                     ) : (
-                      <div className="h-16 w-16 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground text-xs font-medium shrink-0">
+                      <div className="h-20 w-20 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground text-xs font-medium shrink-0">
                         No image
                       </div>
                     )}
 
-                    <div className="flex-1 space-y-1">
+                    <div className="flex-1 space-y-1.5">
                       <Input
+                        id="edit-product-image-file"
                         type="file"
                         accept="image/*"
                         onChange={handleEditImageChange}
                         className="text-xs"
                       />
-                      <p className="text-[11px] text-muted-foreground">
-                        Select a new file to replace the current image. The old image will be permanently purged from database storage.
-                      </p>
+                      {editForm.previewUrl ? (
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="text-primary font-medium truncate max-w-[220px]">
+                            {editForm.imageFile?.name} (
+                            {Math.round((editForm.imageFile?.size || 0) / 1024)} KB)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditForm((prev) => ({
+                                ...prev,
+                                imageFile: null,
+                                previewUrl: null,
+                              }));
+                              const fileInput = document.getElementById(
+                                'edit-product-image-file'
+                              ) as HTMLInputElement;
+                              if (fileInput) fileInput.value = '';
+                            }}
+                            className="text-destructive hover:underline font-medium shrink-0"
+                          >
+                            Revert
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          Select a new photo to replace current image.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
