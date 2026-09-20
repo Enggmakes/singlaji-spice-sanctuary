@@ -28,6 +28,7 @@ interface OrderItem {
 
 interface OrderDetailData {
   id: string;
+  user_id?: string;
   created_at: string;
   status: string;
   subtotal: number;
@@ -88,26 +89,61 @@ const getStepIndex = (status: string) => {
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [order, setOrder] = useState<OrderDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety timer: Never freeze on loading screen
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+
     if (id) {
       fetchOrderDetail(id);
+
+      // Realtime subscription for live status changes on this order
+      const channel = supabase
+        .channel(`order_live_${id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `id=eq.${id}`,
+          },
+          () => {
+            fetchOrderDetailSilent(id);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        clearTimeout(safetyTimer);
+        supabase.removeChannel(channel);
+      };
     }
+
+    return () => clearTimeout(safetyTimer);
   }, [id]);
 
   const fetchOrderDetail = async (orderId: string) => {
     setLoading(true);
+    await fetchOrderDetailSilent(orderId);
+    setLoading(false);
+  };
+
+  const fetchOrderDetailSilent = async (orderId: string) => {
     try {
       const { data, error } = await supabase
         .from('orders')
         .select(
           `
           id,
+          user_id,
           created_at,
           status,
           subtotal,
@@ -122,6 +158,9 @@ export default function OrderDetail() {
           pincode,
           payment_method,
           notes,
+          courier_name,
+          tracking_number,
+          tracking_url,
           order_items (
             id,
             product_name,
@@ -138,16 +177,54 @@ export default function OrderDetail() {
       }
     } catch (err) {
       console.error('Error loading order detail:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-24 text-center text-muted-foreground animate-pulse">
-          Loading live order tracking…
+        <div className="container mx-auto px-4 py-24 text-center text-muted-foreground">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3"></div>
+          <p className="text-sm font-medium">Loading live order tracking…</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // PRIVACY RESTRICTION CHECK:
+  // Customers may only view their own orders. Admins can view any order.
+  const isAuthorized =
+    isAdmin ||
+    (user &&
+      order &&
+      (order.user_id === user.id ||
+        (order.customer_email &&
+          user.email &&
+          order.customer_email.toLowerCase().trim() ===
+            user.email.toLowerCase().trim())));
+
+  if (order && !isAuthorized) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-24 text-center max-w-md">
+          <div className="h-14 w-14 mx-auto rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mb-4">
+            <AlertCircle className="h-7 w-7" />
+          </div>
+          <h1 className="text-2xl font-serif font-bold mb-2 text-foreground">
+            Access Restricted
+          </h1>
+          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+            For privacy and security, you can only view orders placed from your own
+            Singlaji account. Sensitive customer information is protected.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button asChild>
+              <Link to="/orders">View My Orders</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/">Back to Store</Link>
+            </Button>
+          </div>
         </div>
       </Layout>
     );

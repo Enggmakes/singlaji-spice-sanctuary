@@ -14,16 +14,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to determine if user is admin
-async function checkAdminRole(userObj: User | null): Promise<boolean> {
-  if (!userObj) {
-    localStorage.removeItem('singlaji_is_admin');
-    return false;
-  }
+// Synchronous helper to determine if user is admin (prevents auth deadlock)
+function isUserAdminSync(userObj: User | null): boolean {
+  if (!userObj) return false;
 
   const email = (userObj.email || '').toLowerCase().trim();
 
-  // 1. Check known store admin emails (including architsinglaji26@gmail.com)
+  // 1. Check known store admin emails (including architsinglaji26@gmail.com, iamwagharyan@gmail.com)
   const envAdmins = (import.meta.env.VITE_ADMIN_EMAILS || import.meta.env.VITE_ADMIN_EMAIL || '')
     .split(',')
     .map((e: string) => e.trim().toLowerCase())
@@ -31,6 +28,7 @@ async function checkAdminRole(userObj: User | null): Promise<boolean> {
 
   const defaultAdminEmails = [
     'architsinglaji26@gmail.com',
+    'iamwagharyan@gmail.com',
     'singlaji2026@gmail.com',
     'admin@singlaji.in',
     'admin@singlaji.com',
@@ -38,13 +36,10 @@ async function checkAdminRole(userObj: User | null): Promise<boolean> {
   ];
 
   if (
-    email === 'architsinglaji26@gmail.com' ||
-    email === 'singlaji2026@gmail.com' ||
+    defaultAdminEmails.includes(email) ||
     email.includes('singlaji') ||
-    email.includes('archit') ||
-    defaultAdminEmails.includes(email)
+    email.includes('archit')
   ) {
-    localStorage.setItem('singlaji_is_admin', 'true');
     return true;
   }
 
@@ -54,84 +49,86 @@ async function checkAdminRole(userObj: User | null): Promise<boolean> {
     userObj.user_metadata?.role === 'admin' ||
     userObj.user_metadata?.is_admin === true
   ) {
-    localStorage.setItem('singlaji_is_admin', 'true');
     return true;
   }
 
-  // 3. Query user_roles table
-  try {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userObj.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    if (data && data.role === 'admin') {
-      localStorage.setItem('singlaji_is_admin', 'true');
-      return true;
-    }
-  } catch (err) {
-    console.warn('Error verifying user_roles from database:', err);
-  }
-
-  localStorage.removeItem('singlaji_is_admin');
   return false;
+}
+
+// Background async check for user_roles table (never called inside onAuthStateChange callback)
+async function checkUserRolesTable(userId: string): Promise<boolean> {
+  try {
+    const { data } = await Promise.race([
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'admin')
+        .maybeSingle(),
+      new Promise<{ data: null }>((resolve) =>
+        setTimeout(() => resolve({ data: null }), 1200)
+      ),
+    ]);
+
+    return Boolean(data && data.role === 'admin');
+  } catch {
+    return false;
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Initialize isAdmin from localStorage so it never flickers false on refresh
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return localStorage.getItem('singlaji_is_admin') === 'true';
-  });
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
-    // Safety fallback: Ensure auth loading is NEVER stuck true for more than 1.5 seconds
+    // Safety fallback: Ensure auth loading is NEVER stuck true for more than 1 second
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-    }, 1500);
+    }, 1000);
 
-    // 1. Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      const currentUser = newSession?.user ?? null;
+    const updateAuthState = (currentSession: Session | null) => {
+      setSession(currentSession);
+      const currentUser = currentSession?.user ?? null;
       setUser(currentUser);
+      setLoading(false);
 
-      if (currentUser) {
-        const adminStatus = await checkAdminRole(currentUser);
-        setIsAdmin(adminStatus);
-      } else {
-        localStorage.removeItem('singlaji_is_admin');
+      if (!currentUser) {
         setIsAdmin(false);
+        return;
       }
 
-      setLoading(false);
+      // Fast synchronous admin check - instant 0ms response
+      const isSyncAdmin = isUserAdminSync(currentUser);
+      setIsAdmin(isSyncAdmin);
+
+      // If not detected via email/metadata, query user_roles outside auth callstack
+      if (!isSyncAdmin) {
+        setTimeout(() => {
+          checkUserRolesTable(currentUser.id).then((roleIsAdmin) => {
+            if (roleIsAdmin) setIsAdmin(true);
+          });
+        }, 0);
+      }
+    };
+
+    // 1. Listen for auth changes (PURE listener - no nested supabase queries)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      updateAuthState(newSession);
     });
 
     // 2. Initial session check
     supabase.auth
       .getSession()
-      .then(async ({ data: { session: initSession } }) => {
-        setSession(initSession);
-        const currentUser = initSession?.user ?? null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          const adminStatus = await checkAdminRole(currentUser);
-          setIsAdmin(adminStatus);
-        } else {
-          localStorage.removeItem('singlaji_is_admin');
-          setIsAdmin(false);
-        }
+      .then(({ data: { session: initSession } }) => {
+        updateAuthState(initSession);
       })
       .catch((err) => {
         console.warn('Initial session check error:', err);
+        setLoading(false);
       })
       .finally(() => {
         clearTimeout(safetyTimer);

@@ -17,6 +17,9 @@ import {
   RefreshCw,
   Clock,
   ShieldAlert,
+  Eye,
+  X,
+  Copy,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -89,6 +92,24 @@ const COMMON_COURIERS = [
   'Other',
 ];
 
+const TRACKING_STEPS = [
+  { key: 'confirmed', title: 'Order Confirmed', description: 'Order verified for delivery' },
+  { key: 'packed', title: 'Packed & Quality Sealed', description: 'Fresh spices sealed at Abohar facility' },
+  { key: 'shipped', title: 'Dispatched / In Transit', description: 'Handed over to courier partner' },
+  { key: 'out_for_delivery', title: 'Out for Delivery', description: 'Courier agent is on the way' },
+  { key: 'delivered', title: 'Delivered', description: 'Package safely delivered to customer' },
+];
+
+const getStepIndex = (status: string) => {
+  const s = (status || '').toLowerCase().trim();
+  if (s === 'pending' || s === 'confirmed') return 0;
+  if (s === 'processing' || s === 'packed') return 1;
+  if (s === 'shipped' || s === 'dispatched' || s === 'in_transit') return 2;
+  if (s === 'out_for_delivery' || s === 'out for delivery') return 3;
+  if (s === 'delivered' || s === 'completed') return 4;
+  return 0;
+};
+
 export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -111,6 +132,8 @@ export default function Admin() {
   const [trackingInputs, setTrackingInputs] = useState<
     Record<string, { courier: string; awb: string }>
   >({});
+  const [previewOrder, setPreviewOrder] = useState<AdminOrder | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const [productForm, setProductForm] = useState<{
     name: string;
@@ -167,16 +190,53 @@ export default function Admin() {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchCategories();
-      fetchProducts();
-      loadCoupons();
-      fetchOrders();
-    }
+    if (!isAdmin) return;
+
+    fetchCategories();
+    fetchProducts();
+    loadCoupons();
+    fetchOrders();
+
+    // SUPABASE REALTIME SUBSCRIPTION FOR LIVE ORDERS
+    const channel = supabase
+      .channel('admin_orders_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        (payload) => {
+          fetchOrdersSilent();
+          if (payload.eventType === 'INSERT') {
+            const newOrder = payload.new as any;
+            const shortId = (newOrder?.id || '').slice(0, 8).toUpperCase();
+            toast.success(`New Order Received! #${shortId}`, {
+              description: `${newOrder?.customer_name || 'Customer'} placed an order for ₹${newOrder?.total || 0}`,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [isAdmin]);
 
   const fetchOrders = async () => {
     setLoadingOrders(true);
+    // Safety fallback: Never keep admin loader stuck for more than 2s
+    const safetyTimer = setTimeout(() => {
+      setLoadingOrders(false);
+    }, 2000);
+
+    try {
+      await fetchOrdersSilent();
+    } finally {
+      clearTimeout(safetyTimer);
+      setLoadingOrders(false);
+    }
+  };
+
+  const fetchOrdersSilent = async () => {
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -207,13 +267,17 @@ export default function Admin() {
           }
           initialTracking[o.id] = { courier: c, awb: a };
         });
-        setTrackingInputs(initialTracking);
+        setTrackingInputs((prev) => ({ ...initialTracking, ...prev }));
+
+        // Also sync previewOrder if currently open
+        setPreviewOrder((current) => {
+          if (!current) return null;
+          const updated = data.find((item: any) => item.id === current.id);
+          return updated ? (updated as unknown as AdminOrder) : current;
+        });
       }
     } catch (err) {
       console.error('Error fetching admin orders:', err);
-      toast.error('Failed to load orders');
-    } finally {
-      setLoadingOrders(false);
     }
   };
 
@@ -736,10 +800,14 @@ export default function Admin() {
                             </a>
                           </Button>
 
-                          <Button asChild size="sm" variant="ghost" className="text-xs">
-                            <Link to={`/orders/${order.id}`} target="_blank">
-                              View Live Tracker <ExternalLink className="h-3 w-3 ml-1" />
-                            </Link>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs font-semibold bg-primary/10 text-primary border-primary/30 hover:bg-primary/20"
+                            onClick={() => setPreviewOrder(order)}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            Preview Tracker
                           </Button>
                         </div>
                       </div>
@@ -1331,6 +1399,249 @@ export default function Admin() {
               ))}
             </div>
           </section>
+        )}
+        {/* ============================================================== */}
+        {/* IN-PAGE LIVE TRACKER PREVIEW MODAL */}
+        {/* ============================================================== */}
+        {previewOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-card w-full max-w-2xl rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                    <Truck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-serif font-bold text-lg text-foreground">
+                        Order #{previewOrder.id.slice(0, 8).toUpperCase()}
+                      </h3>
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ${
+                          previewOrder.status === 'cancelled'
+                            ? 'bg-destructive/15 text-destructive'
+                            : previewOrder.status === 'delivered'
+                            ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
+                            : 'bg-primary/15 text-primary'
+                        }`}
+                      >
+                        {previewOrder.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Live Customer Delivery Tracker Preview
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setPreviewOrder(null)}
+                    className="h-8 w-8 rounded-full hover:bg-muted"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Modal Body - Scrollable */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                {/* 5-Step Progress Timeline */}
+                <div className="bg-muted/20 p-5 rounded-xl border border-border">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
+                    5-Stage Customer Tracking Timeline
+                  </h4>
+                  <div className="space-y-4">
+                    {TRACKING_STEPS.map((step, idx) => {
+                      const curStep = getStepIndex(previewOrder.status);
+                      const isCompleted = idx <= curStep && previewOrder.status !== 'cancelled';
+                      const isCurrent = idx === curStep && previewOrder.status !== 'cancelled';
+
+                      return (
+                        <div key={step.key} className="flex items-start gap-3 relative">
+                          {/* Timeline connector line */}
+                          {idx < TRACKING_STEPS.length - 1 && (
+                            <div
+                              className={`absolute left-3.5 top-7 bottom-0 w-0.5 -mb-4 ${
+                                idx < curStep ? 'bg-primary' : 'bg-border'
+                              }`}
+                            />
+                          )}
+
+                          <div
+                            className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors z-10 ${
+                              isCurrent
+                                ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
+                                : isCompleted
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground border border-border'
+                            }`}
+                          >
+                            {isCompleted ? <Check className="h-3.5 w-3.5" /> : idx + 1}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm font-semibold ${
+                                isCurrent
+                                  ? 'text-primary'
+                                  : isCompleted
+                                  ? 'text-foreground'
+                                  : 'text-muted-foreground'
+                              }`}
+                            >
+                              {step.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{step.description}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Courier & Dispatch Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl border border-border bg-background">
+                    <p className="text-xs text-muted-foreground font-semibold uppercase">
+                      Courier Partner
+                    </p>
+                    <p className="text-sm font-bold text-foreground mt-1">
+                      {previewOrder.courier_name || 'Singlaji Express / Standard Dispatch'}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl border border-border bg-background">
+                    <p className="text-xs text-muted-foreground font-semibold uppercase">
+                      AWB / Tracking ID
+                    </p>
+                    <p className="font-mono text-sm font-bold text-foreground mt-1">
+                      {previewOrder.tracking_number || 'Will be updated upon pickup'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Customer & Address Details */}
+                <div className="p-4 rounded-xl border border-border bg-background space-y-2 text-xs">
+                  <div className="flex justify-between items-center border-b border-border/50 pb-2">
+                    <span className="text-muted-foreground">Recipient Name:</span>
+                    <span className="font-bold text-foreground">{previewOrder.customer_name}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-border/50 pb-2">
+                    <span className="text-muted-foreground">Contact Phone:</span>
+                    <span className="font-mono font-medium text-foreground">
+                      {previewOrder.customer_phone}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-start border-b border-border/50 pb-2">
+                    <span className="text-muted-foreground">Delivery Address:</span>
+                    <span className="font-medium text-right text-foreground max-w-[280px]">
+                      {previewOrder.address}, {previewOrder.city}, {previewOrder.state} -{' '}
+                      {previewOrder.pincode}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-muted-foreground">Payment (Cash on Delivery):</span>
+                    <span className="font-bold text-primary text-sm">
+                      ₹{previewOrder.total?.toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Ordered Items */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Items in this package ({previewOrder.order_items?.length || 0})
+                  </p>
+                  <div className="divide-y divide-border border border-border rounded-xl p-3 bg-muted/10 text-xs">
+                    {previewOrder.order_items?.map((item) => (
+                      <div key={item.id} className="py-1.5 first:pt-0 flex justify-between">
+                        <span>
+                          {item.product_name} ×{' '}
+                          <span className="font-semibold">{item.quantity}</span>
+                        </span>
+                        <span className="font-mono font-medium">
+                          ₹{(item.price * item.quantity).toFixed(0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer / Actions */}
+              <div className="p-4 border-t border-border bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => {
+                      const url = `https://singlaji.in/orders/${previewOrder.id}`;
+                      navigator.clipboard.writeText(url);
+                      setCopiedLink(true);
+                      toast.success('Customer Tracking Link copied to clipboard!');
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    }}
+                  >
+                    {copiedLink ? (
+                      <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {copiedLink ? 'Copied!' : 'Copy Customer Link'}
+                  </Button>
+
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/30"
+                  >
+                    <a
+                      href={`https://wa.me/91${previewOrder.customer_phone.replace(
+                        /\D/g,
+                        ''
+                      )}?text=${encodeURIComponent(
+                        `Hi ${previewOrder.customer_name}, here is your live tracking link for Singlaji Spices Order #${previewOrder.id.slice(
+                          0,
+                          8
+                        ).toUpperCase()}: https://singlaji.in/orders/${previewOrder.id}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                      WhatsApp Link
+                    </a>
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    asChild
+                  >
+                    <Link to={`/orders/${previewOrder.id}`} target="_blank">
+                      Open in New Tab <ExternalLink className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    className="text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={() => setPreviewOrder(null)}
+                  >
+                    Close Preview
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </Layout>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Package, RefreshCw } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,19 +30,59 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety fallback: Never keep loading spinner stuck for more than 1.5s
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1500);
+
     if (!authLoading && !user) {
-      navigate('/login');
+      navigate('/login?redirect=/orders');
       return;
     }
 
     if (user) {
       fetchOrders();
+
+      // Realtime subscription for customer's own orders
+      const channel = supabase
+        .channel(`customer_orders_${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            fetchOrdersSilent();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        clearTimeout(safetyTimer);
+        supabase.removeChannel(channel);
+      };
     }
-  }, [user, authLoading, navigate]);
+
+    return () => clearTimeout(safetyTimer);
+  }, [user?.id, authLoading]);
 
   const fetchOrders = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    await fetchOrdersSilent();
+    setLoading(false);
+  };
+
+  const fetchOrdersSilent = async () => {
+    if (!user) return;
     try {
+      // PRIVACY ENFORCEMENT: Strictly fetch ONLY orders belonging to this logged in customer
       const { data, error } = await supabase
         .from('orders')
         .select(
@@ -59,23 +99,23 @@ export default function Orders() {
           )
         `
         )
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
         setOrders(data as unknown as Order[]);
       }
     } catch (err) {
-      console.error('Error fetching orders:', err);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching customer orders:', err);
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading && !user) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-24 text-center text-muted-foreground">
-          Loading your orders…
+        <div className="container mx-auto px-4 py-24 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-3"></div>
+          <p className="text-muted-foreground text-sm">Authenticating…</p>
         </div>
       </Layout>
     );
@@ -92,9 +132,31 @@ export default function Orders() {
           Back to Home
         </Link>
 
-        <h1 className="text-3xl font-serif font-bold mb-10">My Orders</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-foreground">My Orders</h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              Track your spice deliveries and view past purchases
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchOrders}
+            disabled={loading}
+            className="text-xs"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
 
-        {orders.length === 0 ? (
+        {loading && orders.length === 0 ? (
+          <div className="py-20 text-center text-muted-foreground">
+            <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-primary mb-3"></div>
+            <p className="text-sm font-medium">Loading your orders…</p>
+          </div>
+        ) : orders.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
