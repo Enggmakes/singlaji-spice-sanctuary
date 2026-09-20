@@ -1,14 +1,14 @@
 /**
  * High-Quality Client-Side Image Compressor for Singlaji Store
  * - Resizes large camera/phone photos (5MB - 25MB) down to crisp max 1400px
- * - Converts to optimized WebP (or JPEG fallback) at 85% visual quality
- * - Decreases file size by 80% - 95% before uploading to Supabase
- * - Uses URL.createObjectURL for near-zero memory overhead and instant performance
- * - Built-in timeout safety ensures upload never hangs
+ * - Preserves native image format (JPEG for JPGs, PNG for PNGs) for maximum compatibility with Supabase storage RLS
+ * - Also produces a dataUrl fallback so product images can save directly even if storage bucket policies block upload
+ * - Decreases file size by 80% - 95% before saving
  */
 
 export interface CompressionResult {
   file: File;
+  dataUrl: string;
   originalSizeKB: number;
   compressedSizeKB: number;
   reductionPercentage: number;
@@ -25,26 +25,20 @@ export async function compressImage(
     mimeType?: string;
   } = {}
 ): Promise<CompressionResult> {
+  const originalSizeKB = Math.round(file.size / 1024);
+
+  // Detect appropriate MIME type based on original file
+  const isPng = file.type.includes('png') || file.name.toLowerCase().endsWith('.png');
+  const isWebp = file.type.includes('webp') || file.name.toLowerCase().endsWith('.webp');
+  const defaultMime = isWebp ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
+  const defaultExt = isWebp ? 'webp' : isPng ? 'png' : 'jpg';
+
   const {
     maxWidth = 1400,
     maxHeight = 1400,
     quality = 0.85,
-    mimeType = 'image/webp',
+    mimeType = defaultMime,
   } = options;
-
-  const originalSizeKB = Math.round(file.size / 1024);
-
-  // If already small and WebP, skip re-compression
-  if (file.size < 80 * 1024 && file.type === 'image/webp') {
-    return {
-      file,
-      originalSizeKB,
-      compressedSizeKB: originalSizeKB,
-      reductionPercentage: 0,
-      width: 0,
-      height: 0,
-    };
-  }
 
   return new Promise((resolve) => {
     let resolved = false;
@@ -59,6 +53,7 @@ export async function compressImage(
     const timer = setTimeout(() => {
       safeResolve({
         file,
+        dataUrl: '',
         originalSizeKB,
         compressedSizeKB: originalSizeKB,
         reductionPercentage: 0,
@@ -74,6 +69,7 @@ export async function compressImage(
       clearTimeout(timer);
       safeResolve({
         file,
+        dataUrl: '',
         originalSizeKB,
         compressedSizeKB: originalSizeKB,
         reductionPercentage: 0,
@@ -106,6 +102,7 @@ export async function compressImage(
           cleanup();
           safeResolve({
             file,
+            dataUrl: '',
             originalSizeKB,
             compressedSizeKB: originalSizeKB,
             reductionPercentage: 0,
@@ -135,6 +132,7 @@ export async function compressImage(
           cleanup();
           safeResolve({
             file,
+            dataUrl: '',
             originalSizeKB,
             compressedSizeKB: originalSizeKB,
             reductionPercentage: 0,
@@ -144,12 +142,30 @@ export async function compressImage(
           return;
         }
 
+        // Fill background with white if converting PNG to JPEG
+        if (mimeType === 'image/jpeg') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+        }
+
         // High quality bicubic filtering
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        const tryExportBlob = (targetType: string, targetQuality: number, onDone: (blob: Blob | null) => void) => {
+        // Generate base64 Data URL for instant fallback
+        let generatedDataUrl = '';
+        try {
+          generatedDataUrl = canvas.toDataURL(mimeType, quality);
+        } catch {
+          // ignore
+        }
+
+        const tryExportBlob = (
+          targetType: string,
+          targetQuality: number,
+          onDone: (blob: Blob | null) => void
+        ) => {
           try {
             canvas.toBlob(
               (blob) => {
@@ -164,22 +180,26 @@ export async function compressImage(
         };
 
         tryExportBlob(mimeType, quality, (blob) => {
-          // If WebP is unsupported or failed, try standard JPEG
+          // If requested format failed, fallback to JPEG
           if (!blob && mimeType !== 'image/jpeg') {
             tryExportBlob('image/jpeg', quality, (fallbackBlob) => {
               processResult(fallbackBlob, 'image/jpeg', 'jpg');
             });
             return;
           }
-          processResult(blob, mimeType, 'webp');
+          processResult(blob, mimeType, defaultExt);
         });
 
-        const processResult = (blob: Blob | null, outputType: string, ext: string) => {
+        const processResult = (
+          blob: Blob | null,
+          outputType: string,
+          ext: string
+        ) => {
           cleanup();
           if (!blob || blob.size >= file.size) {
-            // Keep original if compression didn't save size or failed
             safeResolve({
               file,
+              dataUrl: generatedDataUrl,
               originalSizeKB,
               compressedSizeKB: originalSizeKB,
               reductionPercentage: 0,
@@ -204,6 +224,7 @@ export async function compressImage(
 
           safeResolve({
             file: optimizedFile,
+            dataUrl: generatedDataUrl,
             originalSizeKB,
             compressedSizeKB,
             reductionPercentage,
@@ -216,6 +237,7 @@ export async function compressImage(
         cleanup();
         safeResolve({
           file,
+          dataUrl: '',
           originalSizeKB,
           compressedSizeKB: originalSizeKB,
           reductionPercentage: 0,
@@ -229,6 +251,7 @@ export async function compressImage(
       cleanup();
       safeResolve({
         file,
+        dataUrl: '',
         originalSizeKB,
         compressedSizeKB: originalSizeKB,
         reductionPercentage: 0,
