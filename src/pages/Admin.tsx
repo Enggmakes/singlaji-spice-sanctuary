@@ -738,7 +738,7 @@ export default function Admin() {
 
                           <Button asChild size="sm" variant="ghost" className="text-xs">
                             <Link to={`/orders/${order.id}`} target="_blank">
-                              Customer View <ExternalLink className="h-3 w-3 ml-1" />
+                              View Live Tracker <ExternalLink className="h-3 w-3 ml-1" />
                             </Link>
                           </Button>
                         </div>

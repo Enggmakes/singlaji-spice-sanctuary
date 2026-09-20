@@ -88,22 +88,17 @@ const getStepIndex = (status: string) => {
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [order, setOrder] = useState<OrderDetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate(`/login?redirect=/orders/${id}`);
-      return;
-    }
-
-    if (id && user) {
+    if (id) {
       fetchOrderDetail(id);
     }
-  }, [id, user, authLoading, navigate]);
+  }, [id]);
 
   const fetchOrderDetail = async (orderId: string) => {
     setLoading(true);
@@ -136,22 +131,19 @@ export default function OrderDetail() {
         `
         )
         .eq('id', orderId)
-        .single();
+        .maybeSingle();
 
       if (!error && data) {
         setOrder(data as unknown as OrderDetailData);
-      } else {
-        navigate('/orders');
       }
     } catch (err) {
       console.error('Error loading order detail:', err);
-      navigate('/orders');
     } finally {
       setLoading(false);
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-24 text-center text-muted-foreground animate-pulse">
@@ -161,7 +153,30 @@ export default function OrderDetail() {
     );
   }
 
-  if (!order) return null;
+  if (!order) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-24 text-center max-w-md">
+          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4 opacity-40" />
+          <h1 className="text-2xl font-serif font-bold mb-2">Order Not Found</h1>
+          <p className="text-sm text-muted-foreground mb-6">
+            We couldn't find an order with ID #{id?.slice(0, 8).toUpperCase()}.
+            Please check the link or contact our support team.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button asChild>
+              <Link to="/">Back to Home</Link>
+            </Button>
+            {user && (
+              <Button variant="outline" asChild>
+                <Link to="/orders">My Orders</Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const currentStep = getStepIndex(order.status);
   const isCancelled = order.status.toLowerCase() === 'cancelled';
