@@ -1,6 +1,13 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # 1. Direct social media crawlers (WhatsApp, Facebook, Twitter, Telegram, LinkedIn, Discord) to dynamic OpenGraph generator
+  RewriteCond %{HTTP_USER_AGENT} (facebookexternalhit|WhatsApp|Facebot|Twitterbot|TelegramBot|LinkedInBot|Discordbot) [NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^(.*)$ /og.php [L,QSA]
+
+  # 2. Standard SPA rewrite for all regular browsers
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

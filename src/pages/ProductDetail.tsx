@@ -7,6 +7,7 @@ import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/product/ProductCard';
 import { useProduct, useProducts } from '@/hooks/useProducts';
 import { useCart } from '@/contexts/CartContext';
+import { useSEO } from '@/hooks/useSEO';
 import { toast } from 'sonner';
 
 export default function ProductDetail() {
@@ -15,6 +16,17 @@ export default function ProductDetail() {
   const { data: relatedProducts } = useProducts(product?.category?.slug);
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
+
+  useSEO({
+    title: product ? `${product.name} (₹${Math.round(product.price)})` : undefined,
+    description: product?.description
+      ? product.description.slice(0, 160)
+      : product?.name
+      ? `Order pure ${product.name} from Singlaji Spices Abohar. 100% authentic, rich aroma, and Cash on Delivery across India.`
+      : undefined,
+    image: product?.image_url,
+    type: 'product',
+  });
 
   if (isLoading) {
     return (

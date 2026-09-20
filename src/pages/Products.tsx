@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/product/ProductCard';
 import { useProducts, useCategories } from '@/hooks/useProducts';
+import { useSEO } from '@/hooks/useSEO';
 import { cn } from '@/lib/utils';
 
 export default function Products() {
@@ -16,6 +17,13 @@ export default function Products() {
   const { data: products, isLoading } = useProducts(categorySlug);
   const { data: categories } = useCategories();
 
+  const currentCategory = categories?.find((c) => c.slug === categorySlug);
+
+  useSEO({
+    title: currentCategory ? `${currentCategory.name} Spices` : 'All Authentic Spices',
+    description: currentCategory?.description || 'Explore our complete collection of handcrafted pure Indian spices and masalas from Abohar.',
+  });
+
   const handleCategoryChange = (slug: string | null) => {
     if (slug) {
       searchParams.set('category', slug);
@@ -25,8 +33,6 @@ export default function Products() {
     setSearchParams(searchParams);
     setMobileFiltersOpen(false);
   };
-
-  const currentCategory = categories?.find((c) => c.slug === categorySlug);
 
   return (
     <Layout>
