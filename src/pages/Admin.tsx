@@ -22,7 +22,6 @@ import {
   Copy,
   Pencil,
   Upload,
-  Zap,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -450,14 +449,9 @@ export default function Admin() {
       let image_url = null;
 
       if (productForm.image) {
-        // High-quality automatic image compression
+        // High-quality automatic image compression (silent background optimization)
         const comp = await compressImage(productForm.image);
         const imageToUpload = comp.file;
-        if (comp.reductionPercentage > 0) {
-          toast.info(
-            `Image optimized: ${comp.originalSizeKB} KB → ${comp.compressedSizeKB} KB (${comp.reductionPercentage}% smaller) with crystal-clear quality`
-          );
-        }
 
         const fileName = `${Date.now()}.webp`;
         const filePath = `products/${fileName}`;
@@ -572,14 +566,9 @@ export default function Admin() {
 
       // 1. If a new image was chosen, compress, upload to storage and delete old file
       if (editForm.imageFile) {
-        // High-quality automatic image compression
+        // High-quality automatic image compression (silent background optimization)
         const comp = await compressImage(editForm.imageFile);
         const imageToUpload = comp.file;
-        if (comp.reductionPercentage > 0) {
-          toast.info(
-            `Image optimized: ${comp.originalSizeKB} KB → ${comp.compressedSizeKB} KB (${comp.reductionPercentage}% smaller) with crystal-clear quality`
-          );
-        }
 
         const fileName = `${Date.now()}_edit.webp`;
         const filePath = `products/${fileName}`;
@@ -1244,10 +1233,6 @@ export default function Admin() {
                       })
                     }
                   />
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1 rounded-md mt-1.5">
-                    <Zap className="h-3 w-3 shrink-0 text-emerald-600 fill-emerald-500" />
-                    <span>Auto-Compression: Any photo size (5MB–25MB) automatically reduces to ~150KB–300KB with 100% crisp sharpness.</span>
-                  </div>
                 </div>
 
                 <Button
@@ -1981,10 +1966,6 @@ export default function Admin() {
                       <p className="text-[11px] text-muted-foreground">
                         Select a new file to replace the current image. The old image will be permanently purged from database storage.
                       </p>
-                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1 rounded-md mt-1">
-                        <Zap className="h-3 w-3 shrink-0 text-emerald-600 fill-emerald-500" />
-                        <span>Auto-Compression: Automatically optimizes large photos without quality loss.</span>
-                      </div>
                     </div>
                   </div>
                 </div>
