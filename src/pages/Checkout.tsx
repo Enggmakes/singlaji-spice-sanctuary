@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -9,6 +9,10 @@ import {
   Tag,
   Check,
   X,
+  LogIn,
+  Truck,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +47,7 @@ export default function Checkout() {
     applyCoupon,
     removeCoupon,
   } = useCart();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
@@ -63,6 +67,35 @@ export default function Checkout() {
     paymentMethod: 'cod',
     notes: '',
   });
+
+  // Prepopulate customer details from profile if user is logged in
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        email: prev.email || user.email || '',
+      }));
+
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setFormData((prev) => ({
+              ...prev,
+              name: prev.name || data.full_name || '',
+              phone: prev.phone || data.phone || '',
+              address: prev.address || data.address || '',
+              city: prev.city || data.city || '',
+              state: prev.state || data.state || 'Punjab',
+              pincode: prev.pincode || data.pincode || '',
+            }));
+          }
+        });
+    }
+  }, [user]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -92,6 +125,12 @@ export default function Checkout() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user) {
+      toast.error('Please sign in to place your order');
+      navigate('/login?redirect=/checkout');
+      return;
+    }
 
     if (
       !formData.name ||
@@ -124,19 +163,20 @@ export default function Checkout() {
         orderNotes = orderNotes ? `${orderNotes} ${couponNote}` : couponNote;
       }
 
-      // Create order
+      // Create order tied permanently to user.id
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: user?.id || null,
+          user_id: user.id,
           customer_name: formData.name,
           customer_phone: formData.phone,
-          customer_email: formData.email || null,
+          customer_email: formData.email || user.email || null,
           address: formData.address,
           city: formData.city,
           state: formData.state,
           pincode: formData.pincode,
           payment_method: formData.paymentMethod,
+          status: 'pending',
           subtotal,
           shipping,
           total: finalTotal,
@@ -161,6 +201,21 @@ export default function Checkout() {
         .insert(orderItems);
 
       if (itemsError) throw itemsError;
+
+      // Update customer profile with delivery details for 1-click future checkout
+      try {
+        await supabase.from('profiles').upsert({
+          user_id: user.id,
+          full_name: formData.name,
+          phone: formData.phone,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.pincode,
+        });
+      } catch (profErr) {
+        console.warn('Profile update warning:', profErr);
+      }
 
       // Success!
       setOrderId(order.id);
@@ -200,6 +255,99 @@ export default function Checkout() {
     return null;
   }
 
+  // Mandatory Sign In Gate (Amazon / Flipkart / Rezoni style)
+  if (!authLoading && !user && !orderPlaced) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-12 md:py-20 max-w-2xl">
+          <Link
+            to="/cart"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Cart
+          </Link>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card rounded-2xl p-8 md:p-10 shadow-card border border-border text-center"
+          >
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <LogIn className="h-8 w-8" />
+            </div>
+
+            <h1 className="text-2xl md:text-3xl font-serif font-bold mb-3">
+              Sign In to Place Your Order
+            </h1>
+            <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto mb-8">
+              To track your spices delivery live, view receipts, and manage your orders (like Amazon & Flipkart), please sign in or create an account.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mb-8">
+              <Button
+                asChild
+                size="lg"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Link to="/login?redirect=/checkout">
+                  <LogIn className="h-4 w-4 mr-2" /> Sign In to Proceed
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link to="/register?redirect=/checkout">
+                  Create New Account
+                </Link>
+              </Button>
+            </div>
+
+            {/* Benefits Banner */}
+            <div className="pt-6 border-t border-border grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+              <div className="flex items-start gap-3">
+                <Truck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Live Tracking</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Track live from Abohar facility to doorstep
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Cash on Delivery</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pay safely with cash when package arrives
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <UserCheck className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Saved Address</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    1-Click checkout for future orders
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Cart Preview summary */}
+            <div className="mt-6 p-4 rounded-xl bg-muted/40 text-left text-xs space-y-1">
+              <div className="flex justify-between font-medium">
+                <span>Items waiting in your cart ({items.length})</span>
+                <span className="font-bold text-primary">₹{finalTotal.toFixed(0)}</span>
+              </div>
+              <p className="text-muted-foreground text-[11px]">
+                Your cart items and applied discounts remain saved when you return.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </Layout>
+    );
+  }
+
   if (orderPlaced) {
     return (
       <Layout>
@@ -216,8 +364,8 @@ export default function Checkout() {
               Order Placed Successfully!
             </h1>
             <p className="text-muted-foreground mb-4">
-              Thank you for shopping with Singlaji Masala Store. We will prepare
-              and dispatch your spices shortly.
+              Thank you for shopping with Singlaji Masala Store. We have received
+              your Cash on Delivery order and are preparing your fresh spices.
             </p>
             {orderId && (
               <p className="text-sm font-mono text-muted-foreground mb-6">
@@ -225,14 +373,20 @@ export default function Checkout() {
               </p>
             )}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <Link to="/products">Continue Shopping</Link>
-              </Button>
-              {user && (
-                <Button variant="outline" asChild>
-                  <Link to="/orders">View My Orders</Link>
+              {orderId && (
+                <Button
+                  asChild
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  size="lg"
+                >
+                  <Link to={`/orders/${orderId}`}>
+                    Track Order Live <Truck className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
               )}
+              <Button variant="outline" asChild size="lg">
+                <Link to="/products">Continue Shopping</Link>
+              </Button>
             </div>
           </motion.div>
         </div>

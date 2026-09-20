@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { toast } from 'sonner';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/';
+
   const { signIn } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +33,7 @@ export default function Login() {
       setLoading(false);
     } else {
       toast.success('Welcome back!');
-      navigate('/');
+      navigate(redirectPath);
     }
   };
 
@@ -98,7 +101,14 @@ export default function Login() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
-                <Link to="/register" className="text-primary font-medium hover:underline">
+                <Link
+                  to={
+                    redirectPath !== '/'
+                      ? `/register?redirect=${encodeURIComponent(redirectPath)}`
+                      : '/register'
+                  }
+                  className="text-primary font-medium hover:underline"
+                >
                   Create one
                 </Link>
               </p>

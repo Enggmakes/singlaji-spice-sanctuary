@@ -146,15 +146,19 @@ export default function Orders() {
                       Status
                     </p>
                     <span
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-medium capitalize ${
-                        order.status === 'pending'
-                          ? 'bg-amber-100 text-amber-800'
-                          : order.status === 'completed' || order.status === 'delivered'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-muted text-muted-foreground'
+                      className={`inline-block rounded-full px-3 py-1 text-xs font-semibold capitalize tracking-wide ${
+                        order.status === 'cancelled'
+                          ? 'bg-destructive/15 text-destructive'
+                          : order.status === 'delivered' || order.status === 'completed'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
+                          : order.status === 'shipped' || order.status === 'out_for_delivery'
+                          ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300'
+                          : order.status === 'packed' || order.status === 'processing'
+                          ? 'bg-purple-100 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300'
+                          : 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300'
                       }`}
                     >
-                      {order.status}
+                      {order.status.replace(/_/g, ' ')}
                     </span>
                   </div>
 
@@ -168,8 +172,14 @@ export default function Orders() {
                   </div>
 
                   <div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to={`/orders/${order.id}`}>View Details</Link>
+                    <Button
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold"
+                      asChild
+                    >
+                      <Link to={`/orders/${order.id}`}>
+                        Track Order →
+                      </Link>
                     </Button>
                   </div>
                 </div>

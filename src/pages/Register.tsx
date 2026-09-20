@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { toast } from 'sonner';
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectPath = searchParams.get('redirect') || '/';
+
   const { signUp } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -43,7 +46,7 @@ export default function Register() {
       setLoading(false);
     } else {
       toast.success('Account created successfully!');
-      navigate('/');
+      navigate(redirectPath);
     }
   };
 
@@ -143,8 +146,15 @@ export default function Register() {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}
-                <Link to="/login" className="text-primary font-medium hover:underline">
-                  Sign in
+                <Link
+                  to={
+                    redirectPath !== '/'
+                      ? `/login?redirect=${encodeURIComponent(redirectPath)}`
+                      : '/login'
+                  }
+                  className="text-primary font-medium hover:underline"
+                >
+                  Sign In
                 </Link>
               </p>
             </div>
