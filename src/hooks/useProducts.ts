@@ -12,7 +12,7 @@ export function useProducts(categorySlug?: string) {
           *,
           category:categories(*)
         `)
-        .eq('is_active', true)
+        .or('is_active.eq.true,is_active.is.null')
         .order('created_at', { ascending: false });
 
       if (categorySlug) {
@@ -38,18 +38,35 @@ export function useFeaturedProducts() {
   return useQuery({
     queryKey: ['products', 'featured'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1. First attempt to fetch products marked as is_featured
+      const { data: featured, error: featError } = await supabase
         .from('products')
         .select(`
           *,
           category:categories(*)
         `)
-        .eq('is_active', true)
+        .or('is_active.eq.true,is_active.is.null')
         .eq('is_featured', true)
+        .order('created_at', { ascending: false })
         .limit(6);
 
-      if (error) throw error;
-      return data as Product[];
+      if (!featError && featured && featured.length > 0) {
+        return featured as Product[];
+      }
+
+      // 2. Smart fallback: if no products are explicitly marked featured, display the top store products
+      const { data: fallback, error: fallError } = await supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(*)
+        `)
+        .or('is_active.eq.true,is_active.is.null')
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (fallError) throw fallError;
+      return (fallback || []) as Product[];
     },
   });
 }
