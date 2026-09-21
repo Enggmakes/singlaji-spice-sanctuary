@@ -110,42 +110,50 @@ export default function ProductDetail() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8 md:py-12">
-        {/* Breadcrumb */}
-        <nav className="mb-8">
-          <Link
-            to="/products"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Products
-          </Link>
-        </nav>
+      <div className="relative min-h-[85vh] overflow-hidden">
+        {/* Ambient Product Page Background Image with Low Opacity */}
+        <div
+          className="absolute inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat opacity-20"
+          style={{ backgroundImage: `url('/product_page_back.png')` }}
+        />
 
-        {/* Product Details */}
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
-          {/* Image */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="w-full max-w-[540px] mx-auto rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
-              {product.image_url ? (
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-full h-auto block object-cover transition-transform duration-500 hover:scale-[1.02]"
-                />
-              ) : (
-                <div className="aspect-square w-full flex items-center justify-center bg-secondary">
-                  <span className="text-8xl font-serif text-muted-foreground/30">
-                    {product.name.charAt(0)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </motion.div>
+        <div className="container mx-auto px-4 py-8 md:py-12 relative z-10">
+          {/* Breadcrumb */}
+          <nav className="mb-8">
+            <Link
+              to="/products"
+              className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Products
+            </Link>
+          </nav>
+
+          {/* Product Details */}
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-14 xl:gap-16 items-start">
+            {/* Image */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex justify-center lg:justify-center"
+            >
+              <div className="w-full max-w-[340px] sm:max-w-[370px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+                {product.image_url ? (
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    className="w-full h-auto max-h-[500px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                  />
+                ) : (
+                  <div className="aspect-square w-full flex items-center justify-center bg-secondary">
+                    <span className="text-8xl font-serif text-muted-foreground/30">
+                      {product.name.charAt(0)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
 
           {/* Info */}
           <motion.div
@@ -172,12 +180,12 @@ export default function ProductDetail() {
             {/* Weight / Pack Size Variants */}
             {variants.length > 0 ? (
               <div className="mb-6 space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Select Pack Size / Quantity
                   </label>
                   {selectedVariant && (
-                    <span className="text-xs font-semibold text-primary">
+                    <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
                       Selected: {selectedVariant.weight}
                     </span>
                   )}
@@ -346,6 +354,7 @@ export default function ProductDetail() {
             </div>
           </section>
         )}
+        </div>
       </div>
     </Layout>
   );
