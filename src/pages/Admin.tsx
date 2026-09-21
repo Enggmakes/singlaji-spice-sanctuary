@@ -22,6 +22,8 @@ import {
   Copy,
   Pencil,
   Upload,
+  Sparkles,
+  Calculator,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -43,6 +45,10 @@ import {
   parseWeightVariants,
   serializeWeightVariants,
   COMMON_WEIGHT_PRESETS,
+  COMMON_RATE_ANCHORS,
+  generateVariantsFromRate,
+  calculateVariantPrice,
+  parseGrams,
   WeightVariant,
 } from '@/lib/weightVariants';
 import { toast } from 'sonner';
@@ -124,138 +130,355 @@ const getStepIndex = (status: string) => {
 };
 
 interface WeightVariantsEditorProps {
+  price: string;
+  onPriceChange: (price: string) => void;
   variants: WeightVariant[];
-  onChange: (variants: WeightVariant[]) => void;
-  basePrice: string | number;
+  onVariantsChange: (variants: WeightVariant[]) => void;
 }
 
-function WeightVariantsEditor({ variants, onChange, basePrice }: WeightVariantsEditorProps) {
-  const handleAddPreset = (weight: string) => {
-    if (variants.some((v) => v.weight.toLowerCase() === weight.toLowerCase())) {
-      toast.info(`Size ${weight} is already in the list`);
+function WeightVariantsEditor({
+  price,
+  onPriceChange,
+  variants,
+  onVariantsChange,
+}: WeightVariantsEditorProps) {
+  const [rateWeight, setRateWeight] = useState<string>('250gm');
+  const [isCustomWeight, setIsCustomWeight] = useState<boolean>(false);
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(() => {
+    if (variants && variants.length > 0) {
+      return variants.map((v) => v.weight);
+    }
+    return ['100gm', '250gm', '500gm', '1kg'];
+  });
+
+  // Sync selectedSizes whenever a new product with variants is loaded
+  useEffect(() => {
+    if (variants && variants.length > 0) {
+      setSelectedSizes(variants.map((v) => v.weight));
+    }
+  }, [variants.length]);
+
+  // Recalculates variants based on current price, anchor weight, and target sizes
+  const recalculateAndApply = (
+    currentPriceStr: string,
+    currentAnchor: string,
+    targetSizes: string[]
+  ) => {
+    const priceNum = parseFloat(currentPriceStr);
+    if (!priceNum || priceNum <= 0 || targetSizes.length === 0) {
       return;
     }
-    const defaultPrice = parseFloat(String(basePrice)) || 100;
-    onChange([...variants, { weight, price: defaultPrice }]);
+    const calculated = generateVariantsFromRate(priceNum, currentAnchor, targetSizes);
+    onVariantsChange(calculated);
   };
 
-  const handleAddCustom = () => {
-    const defaultPrice = parseFloat(String(basePrice)) || 100;
-    onChange([...variants, { weight: '', price: defaultPrice }]);
+  const handlePriceChange = (val: string) => {
+    onPriceChange(val);
+    if (selectedSizes.length > 0 && parseFloat(val) > 0) {
+      recalculateAndApply(val, rateWeight, selectedSizes);
+    }
   };
 
-  const handleUpdate = (index: number, field: 'weight' | 'price', value: any) => {
+  const handleRateWeightChange = (newAnchor: string) => {
+    setRateWeight(newAnchor);
+    if (selectedSizes.length > 0 && parseFloat(price) > 0) {
+      recalculateAndApply(price, newAnchor, selectedSizes);
+    }
+  };
+
+  const toggleSizeSelection = (size: string) => {
+    let nextSizes: string[];
+    if (selectedSizes.includes(size)) {
+      if (selectedSizes.length === 1) {
+        toast.info('At least one pack size is required. Or click "Single Pack Only".');
+        return;
+      }
+      nextSizes = selectedSizes.filter((s) => s !== size);
+    } else {
+      nextSizes = [...selectedSizes, size];
+    }
+    setSelectedSizes(nextSizes);
+    if (parseFloat(price) > 0) {
+      recalculateAndApply(price, rateWeight, nextSizes);
+    }
+  };
+
+  const handleSelectStandard = () => {
+    const std = ['100gm', '250gm', '500gm', '1kg'];
+    setSelectedSizes(std);
+    if (parseFloat(price) > 0) {
+      recalculateAndApply(price, rateWeight, std);
+    }
+  };
+
+  const handleSelectAll = () => {
+    const all = COMMON_WEIGHT_PRESETS;
+    setSelectedSizes(all);
+    if (parseFloat(price) > 0) {
+      recalculateAndApply(price, rateWeight, all);
+    }
+  };
+
+  const handleClearVariants = () => {
+    setSelectedSizes([]);
+    onVariantsChange([]);
+  };
+
+  const handleUpdateVariant = (index: number, field: 'weight' | 'price', val: any) => {
     const next = [...variants];
-    next[index] = { ...next[index], [field]: value };
-    onChange(next);
+    next[index] = { ...next[index], [field]: val };
+    onVariantsChange(next);
   };
 
-  const handleRemove = (index: number) => {
-    onChange(variants.filter((_, i) => i !== index));
+  const handleRemoveVariant = (index: number) => {
+    const next = variants.filter((_, i) => i !== index);
+    onVariantsChange(next);
+    setSelectedSizes(next.map((v) => v.weight));
   };
+
+  const handleAddCustomSize = () => {
+    const defaultP = parseFloat(price) || 100;
+    const next = [...variants, { weight: '', price: defaultP }];
+    onVariantsChange(next);
+  };
+
+  const rateGrams = parseGrams(rateWeight);
+  const numPrice = parseFloat(price);
+  const perGramPrice =
+    rateGrams > 0 && numPrice > 0 ? (numPrice / rateGrams).toFixed(2) : null;
 
   return (
-    <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/80">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <Label className="text-xs font-semibold text-foreground">
-            Weight Pack Sizes & Custom Pricing (Optional)
-          </Label>
-          <p className="text-[11px] text-muted-foreground">
-            Offer sizes like 100gm, 250gm, 500gm, 1kg with their own prices.
-          </p>
+    <div className="space-y-4 p-4 rounded-xl bg-muted/20 border border-border/80">
+      {/* Smart Rate Engine Header */}
+      <div className="p-4 rounded-xl bg-background border border-primary/20 shadow-soft space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Pricing & Pack Size Auto-Calculator
+              </h4>
+              <p className="text-[11px] text-muted-foreground">
+                Enter your rate (e.g. ₹199 per 250gm) — all other sizes calculate automatically in real time!
+              </p>
+            </div>
+          </div>
+          {perGramPrice && (
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              ≈ ₹{perGramPrice} / gm
+            </span>
+          )}
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleAddCustom}
-          className="text-xs h-7 gap-1 shrink-0 self-start sm:self-auto"
-        >
-          <Plus className="h-3 w-3" /> Add Custom Size
-        </Button>
-      </div>
 
-      {/* Quick Add Presets */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1">
-        <span className="text-[11px] font-medium text-muted-foreground mr-1">Quick Add:</span>
-        {COMMON_WEIGHT_PRESETS.map((preset) => {
-          const isAdded = variants.some(
-            (v) => v.weight.trim().toLowerCase() === preset.toLowerCase()
-          );
-          return (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => handleAddPreset(preset)}
-              disabled={isAdded}
-              className={`text-[11px] px-2.5 py-1 rounded-md border font-medium transition-colors ${
-                isAdded
-                  ? 'bg-muted text-muted-foreground border-transparent cursor-not-allowed opacity-50'
-                  : 'bg-background hover:bg-primary/10 hover:text-primary hover:border-primary/40 border-border text-foreground'
-              }`}
-            >
-              + {preset}
-            </button>
-          );
-        })}
-      </div>
+        {/* Rate Setting Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <div>
+            <Label className="text-xs font-semibold block mb-1">
+              Rate Price (₹) *
+            </Label>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={price}
+              onChange={(e) => handlePriceChange(e.target.value)}
+              placeholder="e.g. 199"
+              className="h-9 text-xs font-bold text-primary"
+              required
+            />
+          </div>
 
-      {/* Variants List */}
-      {variants.length > 0 && (
-        <div className="space-y-2 mt-2 pt-2 border-t border-border/50">
-          {variants.map((v, idx) => (
-            <div
-              key={idx}
-              className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border"
-            >
-              <div className="flex-1">
-                <Label className="text-[10px] text-muted-foreground block mb-0.5">
-                  Pack Size (e.g. 500gm)
-                </Label>
-                <Input
-                  value={v.weight}
-                  onChange={(e) => handleUpdate(idx, 'weight', e.target.value)}
-                  placeholder="e.g. 250gm, 1kg"
-                  className="h-8 text-xs"
-                />
+          <div>
+            <Label className="text-xs font-semibold block mb-1">
+              For Quantity / Weight *
+            </Label>
+            {!isCustomWeight ? (
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={rateWeight}
+                  onChange={(e) => {
+                    if (e.target.value === 'custom') {
+                      setIsCustomWeight(true);
+                    } else {
+                      handleRateWeightChange(e.target.value);
+                    }
+                  }}
+                  className="w-full h-9 border rounded-md px-2.5 bg-background text-xs border-input font-medium"
+                >
+                  {COMMON_RATE_ANCHORS.map((anchor) => (
+                    <option key={anchor} value={anchor}>
+                      {anchor}
+                    </option>
+                  ))}
+                  <option value="custom">Custom Weight...</option>
+                </select>
               </div>
-              <div className="w-28">
-                <Label className="text-[10px] text-muted-foreground block mb-0.5">
-                  Price (₹)
-                </Label>
+            ) : (
+              <div className="flex items-center gap-1">
                 <Input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={v.price}
-                  onChange={(e) =>
-                    handleUpdate(idx, 'price', parseFloat(e.target.value) || 0)
-                  }
-                  placeholder="₹"
-                  className="h-8 text-xs"
+                  value={rateWeight}
+                  onChange={(e) => handleRateWeightChange(e.target.value)}
+                  placeholder="e.g. 75gm, 250gm"
+                  className="h-9 text-xs flex-1"
                 />
-              </div>
-              <div className="pt-4">
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemove(idx)}
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  title="Remove pack size"
+                  size="sm"
+                  onClick={() => {
+                    setIsCustomWeight(false);
+                    handleRateWeightChange('250gm');
+                  }}
+                  className="text-[11px] h-9 px-2"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  Preset
                 </Button>
               </div>
-            </div>
-          ))}
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-1">
-            ✓ Storefront will display: From ₹
-            {Math.min(...variants.map((v) => v.price || 0))} with interactive size selector.
-          </p>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Pack Size Toggles */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-foreground">
+              Offered Pack Sizes:
+            </span>
+            <div className="flex items-center gap-2 text-[11px]">
+              <button
+                type="button"
+                onClick={handleSelectStandard}
+                className="text-primary hover:underline font-medium"
+              >
+                Standard (100g-1kg)
+              </button>
+              <span className="text-muted-foreground">•</span>
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="text-primary hover:underline font-medium"
+              >
+                All Sizes
+              </button>
+              <span className="text-muted-foreground">•</span>
+              <button
+                type="button"
+                onClick={handleClearVariants}
+                className="text-muted-foreground hover:text-destructive hover:underline font-medium"
+              >
+                Single Pack Only
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {COMMON_WEIGHT_PRESETS.map((preset) => {
+              const isSelected = selectedSizes.includes(preset);
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => toggleSizeSelection(preset)}
+                  className={`text-xs px-3 py-1 rounded-lg border font-medium transition-all flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                      : 'bg-muted/40 text-muted-foreground hover:text-foreground border-border'
+                  }`}
+                >
+                  {isSelected && <Check className="h-3 w-3" />}
+                  {preset}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Live Calculated Variants Table */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs font-semibold text-foreground">
+            {variants.length > 0
+              ? `Auto-Calculated Pack Sizes (${variants.length})`
+              : 'Single Pack Spice (No extra sizes)'}
+          </Label>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleAddCustomSize}
+            className="text-xs h-7 gap-1"
+          >
+            <Plus className="h-3 w-3" /> Add Custom Size
+          </Button>
+        </div>
+
+        {variants.length > 0 ? (
+          <div className="space-y-2 pt-1 border-t border-border/50">
+            {variants.map((v, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border"
+              >
+                <div className="flex-1">
+                  <Label className="text-[10px] text-muted-foreground block mb-0.5">
+                    Pack Size / Weight
+                  </Label>
+                  <Input
+                    value={v.weight}
+                    onChange={(e) => handleUpdateVariant(idx, 'weight', e.target.value)}
+                    placeholder="e.g. 250gm, 1kg"
+                    className="h-8 text-xs font-medium"
+                  />
+                </div>
+                <div className="w-28">
+                  <Label className="text-[10px] text-muted-foreground block mb-0.5">
+                    Price (₹)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={v.price}
+                    onChange={(e) =>
+                      handleUpdateVariant(idx, 'price', parseFloat(e.target.value) || 0)
+                    }
+                    placeholder="₹"
+                    className="h-8 text-xs font-semibold text-primary"
+                  />
+                </div>
+                <div className="pt-4">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveVariant(idx)}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    title="Remove pack size"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-300 font-medium space-y-0.5">
+              <p>
+                ✓ Catalog starting price: <strong>From ₹{Math.min(...variants.map((v) => v.price || 0))}</strong>
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Prices update in real time when you change Rate Price or Pack Sizes. You can also manually adjust any price above.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-lg bg-muted/30 border border-dashed border-border text-center text-xs text-muted-foreground">
+            Selling as a single pack at ₹{price || 0}. Select pack sizes above to offer multiple weights.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -682,19 +905,19 @@ export default function Admin() {
         '-' +
         Date.now();
 
-      const validVariants = productForm.variants.filter((v) => v.weight.trim() && v.price > 0);
+      const validVariants = (productForm.variants || []).filter((v) => v.weight && v.weight.trim() && v.price > 0);
       const weightData = serializeWeightVariants(validVariants);
-      const minVariantPrice = validVariants.length > 0
-        ? validVariants.reduce((min, v) => (v.price < min ? v.price : min), validVariants[0].price)
-        : parseFloat(productForm.price);
+      const finalPrice = validVariants.length > 0
+        ? Math.min(...validVariants.map((v) => v.price))
+        : parseFloat(productForm.price) || 0;
 
       const { error } = await supabase.from('products').insert({
-        name: productForm.name,
+        name: productForm.name.trim(),
         slug,
-        price: minVariantPrice,
+        price: finalPrice,
         stock: parseInt(productForm.stock) || 0,
         category_id: productForm.category_id,
-        description: productForm.description,
+        description: productForm.description.trim() || null,
         image_url,
         weight: weightData || null,
       });
@@ -724,9 +947,21 @@ export default function Admin() {
   const handleOpenEditProduct = (prod: Product) => {
     setEditingProduct(prod);
     const parsedVariants = parseWeightVariants(prod.weight, prod.price);
+    
+    // Initial rate price: if 250gm variant exists, use it, else base price
+    let initialPrice = prod.price.toString();
+    if (parsedVariants.length > 0) {
+      const v250 = parsedVariants.find((v) => v.weight.toLowerCase() === '250gm');
+      if (v250) {
+        initialPrice = v250.price.toString();
+      } else {
+        initialPrice = parsedVariants[0].price.toString();
+      }
+    }
+
     setEditForm({
       name: prod.name,
-      price: prod.price.toString(),
+      price: initialPrice,
       stock: (prod.stock ?? 0).toString(),
       category_id: prod.category_id || '',
       description: prod.description || '',
@@ -771,18 +1006,18 @@ export default function Admin() {
         }
       }
 
-      const validVariants = editForm.variants.filter((v) => v.weight.trim() && v.price > 0);
+      const validVariants = (editForm.variants || []).filter((v) => v.weight && v.weight.trim() && v.price > 0);
       const weightData = serializeWeightVariants(validVariants);
-      const minVariantPrice = validVariants.length > 0
-        ? validVariants.reduce((min, v) => (v.price < min ? v.price : min), validVariants[0].price)
-        : parseFloat(editForm.price);
+      const finalPrice = validVariants.length > 0
+        ? Math.min(...validVariants.map((v) => v.price))
+        : parseFloat(editForm.price) || 0;
 
       // 2. Update product in database
       const { error: updateError } = await supabase
         .from('products')
         .update({
           name: editForm.name.trim(),
-          price: minVariantPrice,
+          price: finalPrice,
           stock: parseInt(editForm.stock) || 0,
           category_id: editForm.category_id || null,
           description: editForm.description.trim() || null,
@@ -1365,19 +1600,6 @@ export default function Admin() {
                     </select>
                   </div>
                   <div>
-                    <Label>Base Price (₹) *</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={productForm.price}
-                      onChange={(e) =>
-                        setProductForm({ ...productForm, price: e.target.value })
-                      }
-                      placeholder="150"
-                      required
-                    />
-                  </div>
-                  <div>
                     <Label>Stock Quantity</Label>
                     <Input
                       type="number"
@@ -1390,11 +1612,12 @@ export default function Admin() {
                   </div>
                 </div>
 
-                {/* Weight & Pricing Variants */}
+                {/* Pricing & Weight Pack Sizes */}
                 <WeightVariantsEditor
+                  price={productForm.price}
+                  onPriceChange={(price) => setProductForm((prev) => ({ ...prev, price }))}
                   variants={productForm.variants}
-                  onChange={(variants) => setProductForm((prev) => ({ ...prev, variants }))}
-                  basePrice={productForm.price}
+                  onVariantsChange={(variants) => setProductForm((prev) => ({ ...prev, variants }))}
                 />
 
                 <div>
@@ -1473,14 +1696,14 @@ export default function Admin() {
                           {prod.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          ₹{prod.price}{' '}
                           {(() => {
                             const v = parseWeightVariants(prod.weight, prod.price);
-                            return v.length > 1
-                              ? `(${v.length} pack sizes)`
-                              : prod.weight
-                              ? `(${prod.weight})`
-                              : '';
+                            if (v.length > 1) {
+                              const minP = Math.min(...v.map((x) => x.price));
+                              const maxP = Math.max(...v.map((x) => x.price));
+                              return `From ₹${minP} to ₹${maxP} (${v.length} pack sizes)`;
+                            }
+                            return `₹${prod.price}${prod.weight ? ` (${prod.weight})` : ''}`;
                           })()}{' '}
                           | Stock: {prod.stock}
                         </p>
@@ -2095,35 +2318,23 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <Label className="text-xs font-semibold">Base Price (₹) *</Label>
+                    <Label className="text-xs font-semibold">Stock Quantity</Label>
                     <Input
                       type="number"
-                      step="0.01"
-                      value={editForm.price}
-                      onChange={(e) => setEditForm({ ...editForm, price: e.target.value })}
-                      placeholder="150"
-                      required
+                      value={editForm.stock}
+                      onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })}
+                      placeholder="50"
                       className="mt-1"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <Label className="text-xs font-semibold">Stock Quantity</Label>
-                  <Input
-                    type="number"
-                    value={editForm.stock}
-                    onChange={(e) => setEditForm({ ...editForm, stock: e.target.value })}
-                    placeholder="50"
-                    className="mt-1"
-                  />
-                </div>
-
-                {/* Weight & Pricing Variants */}
+                {/* Pricing & Weight Pack Sizes */}
                 <WeightVariantsEditor
+                  price={editForm.price}
+                  onPriceChange={(price) => setEditForm((prev) => ({ ...prev, price }))}
                   variants={editForm.variants}
-                  onChange={(variants) => setEditForm((prev) => ({ ...prev, variants }))}
-                  basePrice={editForm.price}
+                  onVariantsChange={(variants) => setEditForm((prev) => ({ ...prev, variants }))}
                 />
 
                 <div>

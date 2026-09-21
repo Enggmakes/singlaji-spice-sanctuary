@@ -123,3 +123,69 @@ export function formatVariantPriceDisplay(
     lowestPrice: lowest,
   };
 }
+
+/**
+ * Common base rate weight units for anchor pricing
+ */
+export const COMMON_RATE_ANCHORS = ['50gm', '100gm', '250gm', '500gm', '1kg'];
+
+/**
+ * Converts any weight string (e.g. "50g", "250gm", "1kg", "2.5kg") into grams
+ */
+export function parseGrams(weightStr: string): number {
+  if (!weightStr) return 0;
+  const clean = weightStr.toLowerCase().replace(/,/g, '').trim();
+
+  // Match kg (e.g. "1kg", "2.5 kg", "1.5kilo")
+  const kgMatch = clean.match(/^([\d.]+)\s*(?:kg|kilo|kilogram)s?$/i);
+  if (kgMatch) {
+    const val = parseFloat(kgMatch[1]);
+    return isNaN(val) ? 0 : Math.round(val * 1000);
+  }
+
+  // Match gm/g (e.g. "50g", "250gm", "500 grams")
+  const gMatch = clean.match(/^([\d.]+)\s*(?:gm|g|gram)s?$/i);
+  if (gMatch) {
+    const val = parseFloat(gMatch[1]);
+    return isNaN(val) ? 0 : Math.round(val);
+  }
+
+  // Fallback to pure number
+  const numOnly = parseFloat(clean);
+  return isNaN(numOnly) ? 0 : Math.round(numOnly);
+}
+
+/**
+ * Calculates variant price for a target weight based on an anchor rate
+ * (e.g. base: 299 for 250gm, target: 1kg -> 1196)
+ */
+export function calculateVariantPrice(
+  basePrice: number,
+  baseWeightStr: string,
+  targetWeightStr: string
+): number {
+  const baseGrams = parseGrams(baseWeightStr);
+  const targetGrams = parseGrams(targetWeightStr);
+
+  if (baseGrams <= 0 || targetGrams <= 0 || basePrice <= 0) {
+    return Math.round(basePrice) || 0;
+  }
+
+  const ratePerGram = basePrice / baseGrams;
+  return Math.round(targetGrams * ratePerGram);
+}
+
+/**
+ * Generates an array of WeightVariants based on an anchor rate and target weight list
+ */
+export function generateVariantsFromRate(
+  basePrice: number,
+  baseWeightStr: string,
+  targetWeights: string[]
+): WeightVariant[] {
+  return targetWeights.map((w) => ({
+    weight: w,
+    price: calculateVariantPrice(basePrice, baseWeightStr, w),
+  }));
+}
+
