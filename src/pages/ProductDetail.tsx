@@ -123,19 +123,20 @@ export default function ProductDetail() {
         </nav>
 
         {/* Product Details */}
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
           {/* Image */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
+            className="lg:col-span-5 flex justify-center lg:justify-start lg:sticky lg:top-24"
           >
-            <div className="w-full max-w-[540px] mx-auto rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+            <div className="w-full max-w-[390px] rounded-2xl overflow-hidden shadow-card border border-border/40 bg-card">
               {product.image_url ? (
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="w-full h-auto block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                  className="w-full h-auto max-h-[520px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
                 />
               ) : (
                 <div className="aspect-square w-full flex items-center justify-center bg-secondary">
@@ -152,7 +153,7 @@ export default function ProductDetail() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col"
+            className="lg:col-span-7 flex flex-col"
           >
             {/* Category */}
             {product.category && (
