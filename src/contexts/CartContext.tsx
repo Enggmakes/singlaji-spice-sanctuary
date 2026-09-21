@@ -32,6 +32,20 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// Unique device/tab session ID to avoid processing self-broadcasts
+function getDeviceId(): string {
+  try {
+    let id = sessionStorage.getItem('singlaji_device_id');
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+      sessionStorage.setItem('singlaji_device_id', id);
+    }
+    return id;
+  } catch {
+    return 'dev_' + Math.random().toString(36).substring(2, 10);
+  }
+}
+
 // Helper function to merge cloud cart and local cart items without duplicating
 function mergeCartItems(cloudItems: CartItem[], localItems: CartItem[]): CartItem[] {
   const merged: CartItem[] = [...cloudItems];
@@ -58,6 +72,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const lastSyncedUserIdRef = useRef<string | null>(null);
   const isSyncingFromCloudRef = useRef<boolean>(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const deviceId = useRef<string>(getDeviceId()).current;
 
   const [items, setItems] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem('singlaji-cart');
@@ -69,7 +85,75 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // 1. Initial Cloud Sync when User logs in or account changes
+  // Helper to pull fresh cart data from Supabase Auth cloud
+  const pullFreshCloudCart = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase.auth.getUser();
+      const freshCloud = data?.user?.user_metadata?.cart_items;
+      if (Array.isArray(freshCloud)) {
+        const localString = localStorage.getItem('singlaji-cart') || '[]';
+        if (JSON.stringify(freshCloud) !== localString) {
+          isSyncingFromCloudRef.current = true;
+          setItems(freshCloud);
+          localStorage.setItem('singlaji-cart', JSON.stringify(freshCloud));
+        }
+      }
+    } catch {
+      // Silently ignore network hiccup during active check
+    }
+  };
+
+  // 1. Setup Supabase Realtime WebSocket Broadcast Channel for Instant Multi-Device Sync
+  useEffect(() => {
+    if (!user) {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      return;
+    }
+
+    const channelName = `cart_realtime_${user.id}`;
+    const channel = supabase.channel(channelName, {
+      config: {
+        broadcast: {
+          self: false,
+        },
+      },
+    });
+
+    channel
+      .on('broadcast', { event: 'cart_sync' }, ({ payload }) => {
+        if (!payload || payload.senderId === deviceId) return;
+
+        if (Array.isArray(payload.items)) {
+          isSyncingFromCloudRef.current = true;
+          setItems(payload.items);
+          localStorage.setItem('singlaji-cart', JSON.stringify(payload.items));
+          if (payload.coupon !== undefined) {
+            setAppliedCoupon(payload.coupon);
+          }
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          // Immediately pull latest upon channel connection
+          pullFreshCloudCart();
+        }
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [user?.id]);
+
+  // 2. Initial Cloud Sync when User logs in or account switches
   useEffect(() => {
     if (!user) {
       lastSyncedUserIdRef.current = null;
@@ -83,12 +167,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const syncOnLogin = async () => {
       try {
-        let cloudRaw = user.user_metadata?.cart_items;
-        if (!cloudRaw) {
-          const { data: userData } = await supabase.auth.getUser();
-          cloudRaw = userData?.user?.user_metadata?.cart_items;
-        }
-
+        const { data: userData } = await supabase.auth.getUser();
+        const cloudRaw = userData?.user?.user_metadata?.cart_items;
         const cloudItems: CartItem[] = Array.isArray(cloudRaw) ? cloudRaw : [];
 
         setItems((currentLocal) => {
@@ -100,7 +180,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
           if (currentLocal.length > 0 && cloudItems.length === 0) {
             supabase.auth.updateUser({
-              data: { cart_items: currentLocal },
+              data: { cart_items: currentLocal, cart_updated_at: Date.now() },
             }).catch(console.warn);
             return currentLocal;
           }
@@ -110,7 +190,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             isSyncingFromCloudRef.current = true;
             localStorage.setItem('singlaji-cart', JSON.stringify(merged));
             supabase.auth.updateUser({
-              data: { cart_items: merged },
+              data: { cart_items: merged, cart_updated_at: Date.now() },
             }).catch(console.warn);
             return merged;
           }
@@ -125,35 +205,38 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     syncOnLogin();
   }, [user?.id]);
 
-  // 2. Real-time Multi-Device tab/window focus sync
+  // 3. Active Background Polling & Window Focus / Visibility Sync
   useEffect(() => {
     if (!user) return;
 
-    const handleFocus = async () => {
-      try {
-        const { data } = await supabase.auth.getUser();
-        const freshCloud = data?.user?.user_metadata?.cart_items;
-        if (Array.isArray(freshCloud)) {
-          const localString = localStorage.getItem('singlaji-cart');
-          if (JSON.stringify(freshCloud) !== localString) {
-            isSyncingFromCloudRef.current = true;
-            setItems(freshCloud);
-            localStorage.setItem('singlaji-cart', JSON.stringify(freshCloud));
-          }
-        }
-      } catch {
-        // Silently catch tab focus check
+    const handleActive = () => {
+      if (document.visibilityState === 'visible') {
+        pullFreshCloudCart();
       }
     };
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener('focus', handleActive);
+    document.addEventListener('visibilitychange', handleActive);
+
+    // Fast 3-second heartbeat poll while tab is visible
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        pullFreshCloudCart();
+      }
+    }, 3000);
+
+    return () => {
+      window.removeEventListener('focus', handleActive);
+      document.removeEventListener('visibilitychange', handleActive);
+      clearInterval(interval);
+    };
   }, [user?.id]);
 
-  // 3. Save to localStorage immediately and sync to Supabase Cloud (debounced)
+  // 4. Save to localStorage, Broadcast via WebSocket, and Persist to Supabase
   useEffect(() => {
     localStorage.setItem('singlaji-cart', JSON.stringify(items));
 
+    // If change was received from another device, avoid sending echo
     if (isSyncingFromCloudRef.current) {
       isSyncingFromCloudRef.current = false;
       return;
@@ -161,18 +244,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     if (!user) return;
 
+    // A. INSTANT WebSocket broadcast to all other open devices/tabs (0ms lag!)
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'cart_sync',
+        payload: {
+          items,
+          coupon: appliedCoupon,
+          senderId: deviceId,
+          timestamp: Date.now(),
+        },
+      }).catch(console.warn);
+    }
+
+    // B. Persist to Supabase Auth cloud (debounced 300ms)
     const timer = setTimeout(() => {
       supabase.auth.updateUser({
-        data: { cart_items: items },
+        data: {
+          cart_items: items,
+          cart_updated_at: Date.now(),
+        },
       }).catch((err) => {
         console.warn('Failed to upload cart to cloud:', err);
       });
-    }, 500);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [items, user?.id]);
 
-  // 4. Coupon persistence
+  // 5. Coupon persistence
   useEffect(() => {
     if (appliedCoupon) {
       localStorage.setItem(
