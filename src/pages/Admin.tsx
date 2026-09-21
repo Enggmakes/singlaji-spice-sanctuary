@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Plus,
@@ -582,6 +583,17 @@ export default function Admin() {
     previewUrl: null,
     variants: [],
   });
+
+  // Lock body scroll and guarantee full screen coverage when modal popup is open
+  useEffect(() => {
+    if (editingProduct || previewOrder) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [editingProduct, previewOrder]);
 
   const [couponForm, setCouponForm] = useState<{
     code: string;
@@ -2045,9 +2057,18 @@ export default function Admin() {
         {/* ============================================================== */}
         {/* IN-PAGE LIVE TRACKER PREVIEW MODAL */}
         {/* ============================================================== */}
-        {previewOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-card w-full max-w-2xl rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        {previewOrder &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[9999] w-screen h-screen min-h-[100dvh] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setPreviewOrder(null);
+              }}
+            >
+              <div
+                className="bg-card w-full max-w-2xl rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col my-auto relative z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
               {/* Modal Header */}
               <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -2283,15 +2304,25 @@ export default function Admin() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* ============================================================== */}
         {/* EDIT SPICE PRODUCT MODAL */}
         {/* ============================================================== */}
-        {editingProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-card w-full max-w-lg rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        {editingProduct &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[9999] w-screen h-screen min-h-[100dvh] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setEditingProduct(null);
+              }}
+            >
+              <div
+                className="bg-card w-full max-w-lg rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[90vh] flex flex-col my-auto relative z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
               {/* Modal Header */}
               <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -2469,7 +2500,8 @@ export default function Admin() {
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </Layout>
