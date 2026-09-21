@@ -123,21 +123,21 @@ export default function ProductDetail() {
         </nav>
 
         {/* Product Details */}
-        <div className="max-w-5xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-8 lg:gap-14 items-center justify-center">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex flex-col md:flex-row items-start justify-center gap-6 lg:gap-10">
             {/* Image */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex justify-center md:justify-end"
+              className="w-full md:w-[380px] shrink-0 flex justify-center"
             >
-              <div className="w-full max-w-[390px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+              <div className="w-full max-w-[380px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-auto max-h-[520px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                    className="w-full h-auto max-h-[500px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
                   />
                 ) : (
                   <div className="aspect-square w-full flex items-center justify-center bg-secondary">
@@ -154,7 +154,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex flex-col justify-center max-w-lg w-full"
+              className="flex-1 min-w-0 max-w-lg w-full flex flex-col pt-1"
             >
             {/* Category */}
             {product.category && (
