@@ -115,9 +115,14 @@ export default function ProductDetail() {
   return (
     <Layout>
       <div className="relative min-h-[85vh] overflow-hidden">
-        {/* Ambient Product Page Background Image with Low Opacity */}
+        {/* Ambient Mobile Background Image */}
         <div
-          className="absolute inset-0 z-0 pointer-events-none bg-cover bg-top sm:bg-center bg-no-repeat opacity-15 sm:opacity-20"
+          className="block sm:hidden absolute inset-0 z-0 pointer-events-none bg-cover bg-top bg-no-repeat opacity-20"
+          style={{ backgroundImage: `url('/product_page_mobile.png')` }}
+        />
+        {/* Ambient Laptop / Desktop Horizontal Background Image */}
+        <div
+          className="hidden sm:block absolute inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat opacity-20"
           style={{ backgroundImage: `url('/product_page_back.png')` }}
         />
         {/* Soft bottom fade to seamlessly blend into background */}
