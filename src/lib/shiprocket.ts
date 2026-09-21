@@ -4,12 +4,18 @@
  * Handles browser CORS restrictions gracefully via proxy and sandbox fallback.
  */
 
+import { calculateOrderWeightKg, lookupPincode } from './pincodeLookup';
+
 export interface ShiprocketConfig {
   baseUrl: string;
   email: string;
   password: string;
   mode: 'sandbox' | 'live';
   pickupLocation: string;
+}
+
+export interface ShiprocketAuthResponse {
+  token: string;
 }
 
 // Default Sandbox configuration
@@ -109,14 +115,14 @@ export async function createAndAssignShipment(
     ? new Date(order.created_at).toISOString().slice(0, 19).replace('T', ' ')
     : new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-  // Calculate approximate weight from items (default 0.5kg)
-  const totalWeightKg = 0.5;
+  // Calculate real weight from items (e.g. 70kg -> 70, 100gm -> 0.1)
+  const totalWeightKg = calculateOrderWeightKg(items);
   const orderItemsPayload = items.length > 0
     ? items.map((item, idx) => {
         const itemPrice = parseFloat(item.price) || 0;
         return {
-          name: item.name || `Singlaji Pure Spice Item #${idx + 1}`,
-          sku: `SPICE-${(item.name || 'PACK').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase()}-${idx + 1}`,
+          name: item.name || item.product_name || `Singlaji Pure Spice Item #${idx + 1}`,
+          sku: `SPICE-${(item.name || item.product_name || 'PACK').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase()}-${idx + 1}`,
           units: parseInt(item.quantity) || 1,
           selling_price: itemPrice.toString(),
           discount: '',
@@ -129,19 +135,24 @@ export async function createAndAssignShipment(
           name: 'Singlaji Traditional Pure Spices Pack',
           sku: 'SINGLAJI-SPICE-PK',
           units: 1,
-          selling_price: (order.total_amount || 299).toString(),
+          selling_price: (order.total_amount || order.total || 299).toString(),
           discount: '',
           tax: '',
           hsn: 910,
         },
       ];
 
-  const address = order.shipping_address || 'Main Road';
-  const city = order.shipping_city || 'Jaipur';
-  const state = order.shipping_state || 'Rajasthan';
-  const pincode = order.shipping_pincode || '302001';
-  const phone = order.shipping_phone || order.phone || '9876543210';
-  const email = order.email || 'customer@singlaji.in';
+  const address = order.shipping_address || order.address || 'Main Road';
+  const pincode = (order.shipping_pincode || order.pincode || '').toString().trim() || '152116';
+  const pinInfo = lookupPincode(pincode);
+  const rawState = (order.shipping_state || order.state || '').trim();
+  const state =
+    !rawState || (rawState.toLowerCase() === 'punjab' && pinInfo.state !== 'Punjab')
+      ? pinInfo.state
+      : rawState;
+  const city = order.shipping_city || order.city || (pinInfo.state === 'Punjab' ? 'Abohar' : 'City');
+  const phone = order.shipping_phone || order.customer_phone || order.phone || '9876543210';
+  const email = order.email || order.customer_email || 'customer@singlaji.in';
 
   try {
     const apiBase = getApiBaseUrl(config.baseUrl);
@@ -266,7 +277,7 @@ export async function createAndAssignShipment(
       channel_order_id: `SINGLAJI-${(order.id || '').slice(0, 8).toUpperCase()}`,
       awb_code: mockAwb,
       courier_name: 'Xpressbees Surface',
-      routing_code: 'ABH/PJB',
+      routing_code: pinInfo.routingCode,
       invoice_url: '',
     };
   }

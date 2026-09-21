@@ -1,4 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 import {
   Dialog,
   DialogContent,
@@ -7,6 +9,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer, Download, ExternalLink, Package, ShieldCheck, QrCode } from 'lucide-react';
+import {
+  calculateOrderWeightKg,
+  formatShippingWeight,
+  lookupPincode,
+} from '@/lib/pincodeLookup';
 
 interface ShippingLabelModalProps {
   open: boolean;
@@ -24,109 +31,75 @@ interface ShippingLabelModalProps {
 }
 
 /**
- * Generates an SVG barcode pattern based on string characters (Code 128 high-density format)
+ * Generates an authentic, laser-scannable Code-128 barcode
  */
-function VisualBarcode({ value, height = 50 }: { value: string; height?: number }) {
-  const bars: { width: number; isSpace: boolean }[] = [];
-  const clean = (value || '123456789').toUpperCase();
+function VisualBarcode({ value, height = 36 }: { value: string; height?: number }) {
+  const svgRef = useRef<SVGSVGElement>(null);
 
-  // Code 128 Start pattern
-  bars.push({ width: 2, isSpace: false }, { width: 1, isSpace: true }, { width: 2, isSpace: false }, { width: 1, isSpace: true });
-
-  for (let i = 0; i < clean.length; i++) {
-    const code = clean.charCodeAt(i);
-    const w1 = (code % 3) + 1;
-    const w2 = ((code >> 1) % 3) + 1;
-    const w3 = ((code >> 2) % 2) + 1;
-    bars.push({ width: w1, isSpace: false });
-    bars.push({ width: w2, isSpace: true });
-    bars.push({ width: w3, isSpace: false });
-    bars.push({ width: 1, isSpace: true });
-  }
-
-  // Code 128 Stop pattern
-  bars.push({ width: 3, isSpace: false }, { width: 1, isSpace: true }, { width: 3, isSpace: false });
-
-  let totalWidth = 0;
-  bars.forEach((b) => (totalWidth += b.width));
-
-  let currentX = 0;
-  const rects = bars.map((b, idx) => {
-    const x = currentX;
-    currentX += b.width;
-    if (b.isSpace) return null;
-    return (
-      <rect
-        key={idx}
-        x={x}
-        y={0}
-        width={b.width}
-        height={height}
-        fill="#000000"
-      />
-    );
-  });
+  useEffect(() => {
+    if (svgRef.current && value) {
+      try {
+        JsBarcode(svgRef.current, value, {
+          format: 'CODE128',
+          lineColor: '#000000',
+          width: 1.8,
+          height: height,
+          displayValue: true,
+          font: 'monospace',
+          fontSize: 12,
+          textMargin: 2,
+          margin: 0,
+        });
+      } catch (err) {
+        console.warn('JsBarcode render warning:', err);
+      }
+    }
+  }, [value, height]);
 
   return (
     <div className="flex flex-col items-center justify-center my-0.5 w-full">
-      <svg
-        viewBox={`0 0 ${totalWidth} ${height}`}
-        className="w-full max-w-[310px] h-[44px]"
-        preserveAspectRatio="none"
-      >
-        {rects}
-      </svg>
-      <span className="font-mono text-xs tracking-widest font-black mt-0.5 text-black">
-        {value}
-      </span>
+      <svg ref={svgRef} className="max-w-[310px] h-[52px]" />
     </div>
   );
 }
 
 /**
- * Authentic 2D Matrix / QR Code representation for courier logistics scanner
+ * Generates a 100% real, ISO-standard scannable QR Code linking directly to package tracking
  */
 function CourierMatrixCode({ value }: { value: string }) {
-  // 13x13 pseudo-matrix grid
-  const grid: boolean[][] = [];
-  const hash = (str: string) => {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-    return Math.abs(h);
-  };
+  const [qrSrc, setQrSrc] = useState<string>('');
 
-  const seed = hash(value);
-  for (let r = 0; r < 11; r++) {
-    const row: boolean[] = [];
-    for (let c = 0; c < 11; c++) {
-      // Corner finder patterns
-      if ((r < 3 && c < 3) || (r < 3 && c > 7) || (r > 7 && c < 3)) {
-        row.push(true);
-      } else {
-        row.push(((seed >> ((r * 11 + c) % 31)) & 1) === 1);
-      }
-    }
-    grid.push(row);
-  }
+  useEffect(() => {
+    if (!value) return;
+    // Direct Shiprocket live tracking URL
+    const trackUrl = `https://shiprocket.co/tracking/${value}`;
+    QRCode.toDataURL(trackUrl, {
+      width: 160,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    })
+      .then((url) => setQrSrc(url))
+      .catch((err) => console.error('Error generating QR code:', err));
+  }, [value]);
 
   return (
     <div className="border-2 border-black p-0.5 bg-white inline-block">
-      <svg viewBox="0 0 44 44" className="w-12 h-12">
-        {grid.map((row, r) =>
-          row.map((fill, c) =>
-            fill ? (
-              <rect
-                key={`${r}-${c}`}
-                x={c * 4}
-                y={r * 4}
-                width={4}
-                height={4}
-                fill="#000000"
-              />
-            ) : null
-          )
-        )}
-      </svg>
+      {qrSrc ? (
+        <img
+          src={qrSrc}
+          alt={`Scan AWB ${value}`}
+          className="w-12 h-12 block"
+          style={{ imageRendering: 'pixelated' }}
+        />
+      ) : (
+        <div className="w-12 h-12 bg-zinc-100 flex items-center justify-center text-[7px] font-bold">
+          LOADING
+        </div>
+      )}
     </div>
   );
 }
@@ -141,9 +114,26 @@ export function ShippingLabelModal({
 
   if (!order) return null;
 
+  const items = order.order_items || [];
+  const realWeightKg = calculateOrderWeightKg(items);
+  const weightDisplay = formatShippingWeight(realWeightKg);
+
+  const destPincode = (order.shipping_pincode || order.pincode || '').toString().trim() || '152116';
+  const pinInfo = lookupPincode(destPincode);
+
+  // If order state is missing or was defaulted to Punjab when pincode is in another state
+  const rawState = (order.shipping_state || order.state || '').trim();
+  const realState =
+    !rawState || (rawState.toLowerCase() === 'punjab' && pinInfo.state !== 'Punjab')
+      ? pinInfo.state
+      : rawState;
+
   const awb = shipmentData?.awb_code || order.tracking_number || '143263211700227';
   const courier = shipmentData?.courier_name || order.courier_name || 'Xpressbees Surface';
-  const routing = shipmentData?.routing_code || 'ABH/PJB';
+  const routing =
+    shipmentData?.routing_code && shipmentData.routing_code !== 'ABH/PJB'
+      ? shipmentData.routing_code
+      : pinInfo.routingCode;
   const invoiceUrl = shipmentData?.invoice_url;
   const officialLabelUrl = shipmentData?.label_url;
 
@@ -157,8 +147,6 @@ export function ShippingLabelModal({
         year: 'numeric',
       })
     : new Date().toLocaleDateString('en-IN');
-
-  const items = order.order_items || [];
 
   const handlePrint = () => {
     const labelNode = document.getElementById('printable-shipping-label');
@@ -362,7 +350,7 @@ export function ShippingLabelModal({
                     WEIGHT & DATE
                   </span>
                   <span className="font-black text-xs text-black block">
-                    0.55 KG
+                    {weightDisplay}
                   </span>
                 </div>
                 <span className="text-[9px] font-bold text-zinc-700">
@@ -385,9 +373,9 @@ export function ShippingLabelModal({
                 </div>
                 <div className="text-xs font-black text-black mt-0.5">
                   {order.shipping_city || order.city || ''}
-                  {(order.shipping_state || order.state) ? `, ${order.shipping_state || order.state}` : ''} -{' '}
+                  {realState ? `, ${realState}` : ''} -{' '}
                   <span className="text-xs font-black underline bg-zinc-100 px-1 py-0.5 border border-black">
-                    {order.shipping_pincode || order.pincode || '302001'}
+                    {destPincode}
                   </span>
                 </div>
                 <div className="text-[10px] font-bold text-black mt-0.5">
