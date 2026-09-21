@@ -25,8 +25,12 @@ import {
   Upload,
   Sparkles,
   Calculator,
+  Printer,
+  Send,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
+import { createAndAssignShipment, ShipmentDetails } from '@/lib/shiprocket';
+import { ShippingLabelModal } from '@/components/ShippingLabelModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -540,6 +544,9 @@ export default function Admin() {
   >({});
   const [previewOrder, setPreviewOrder] = useState<AdminOrder | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [shippingOrderId, setShippingOrderId] = useState<string | null>(null);
+  const [activeLabelOrder, setActiveLabelOrder] = useState<AdminOrder | null>(null);
+  const [activeShipmentData, setActiveShipmentData] = useState<ShipmentDetails | null>(null);
 
   const [productForm, setProductForm] = useState<{
     name: string;
@@ -859,6 +866,92 @@ export default function Admin() {
       console.error('Error saving tracking:', err);
       toast.error('Failed to save tracking details');
     }
+  };
+
+  const handleShipWithShiprocket = async (order: AdminOrder) => {
+    setShippingOrderId(order.id);
+    const toastId = toast.loading('Connecting to Shiprocket Sandbox & booking courier...');
+    try {
+      const result = await createAndAssignShipment(order, order.order_items || []);
+
+      // 1. Update order status in Supabase to shipped and save courier & AWB
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'shipped',
+          courier_name: result.courier_name,
+          tracking_number: result.awb_code,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', order.id);
+
+      if (error) {
+        // Fallback: update in notes
+        const trackingNote = `[Courier: ${result.courier_name} | Track: ${result.awb_code}]`;
+        await supabase
+          .from('orders')
+          .update({
+            status: 'shipped',
+            notes: (order.notes || '') + ' ' + trackingNote,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', order.id);
+      }
+
+      // Update local state
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id
+            ? {
+                ...o,
+                status: 'shipped',
+                courier_name: result.courier_name,
+                tracking_number: result.awb_code,
+              }
+            : o
+        )
+      );
+
+      setTrackingInputs((prev) => ({
+        ...prev,
+        [order.id]: { courier: result.courier_name, awb: result.awb_code },
+      }));
+
+      toast.success(
+        `Dispatched via ${result.courier_name}! AWB: ${result.awb_code}`,
+        {
+          id: toastId,
+          description: 'Opening ready-to-print Amazon-style shipping label...',
+        }
+      );
+
+      // Open label modal immediately with assigned AWB and courier
+      setActiveShipmentData(result);
+      setActiveLabelOrder(order);
+    } catch (err: any) {
+      console.error('Shiprocket shipment error:', err);
+      toast.error('Shiprocket Error: ' + (err.message || 'Failed to dispatch shipment'), {
+        id: toastId,
+      });
+    } finally {
+      setShippingOrderId(null);
+    }
+  };
+
+  const handleOpenLabelModal = (order: AdminOrder) => {
+    const tracking = trackingInputs[order.id] || {
+      courier: order.courier_name || '',
+      awb: order.tracking_number || '',
+    };
+    setActiveShipmentData({
+      order_id: 0,
+      shipment_id: 0,
+      channel_order_id: order.id,
+      awb_code: tracking.awb || order.tracking_number || '143263211801491',
+      courier_name: tracking.courier || order.courier_name || 'Xpressbees Surface',
+      routing_code: 'ABH/PJB',
+    });
+    setActiveLabelOrder(order);
   };
 
   // Category Handlers
@@ -1565,10 +1658,59 @@ export default function Admin() {
                             </select>
                           </div>
 
+                          {/* 1-Click Shiprocket Sandbox Dispatch & Barcode Label */}
+                          <div className="p-3 rounded-xl bg-card border border-primary/20 space-y-2 shadow-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                                <Truck className="h-3.5 w-3.5 text-primary" />
+                                Shiprocket Logistics
+                              </span>
+                              <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                Sandbox Mode
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-1.5">
+                              {/* If order not yet shipped or no AWB, show 1-Click Ship button */}
+                              {(!tracking.awb || order.status === 'pending' || order.status === 'confirmed' || order.status === 'packed') && (
+                                <Button
+                                  size="sm"
+                                  variant="hero"
+                                  disabled={shippingOrderId === order.id}
+                                  onClick={() => handleShipWithShiprocket(order)}
+                                  className="w-full h-8 text-xs font-semibold gap-1.5 shadow-sm"
+                                >
+                                  {shippingOrderId === order.id ? (
+                                    <>
+                                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                      Booking Courier...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="h-3.5 w-3.5" />
+                                      Ship with Shiprocket
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+
+                              {/* Print Barcode Label Button */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenLabelModal(order)}
+                                className="w-full h-8 text-xs font-semibold gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                                Print Shipping Label (Barcode)
+                              </Button>
+                            </div>
+                          </div>
+
                           {/* Courier Partner & AWB Number */}
                           <div className="space-y-2 pt-2 border-t border-border">
                             <Label className="text-xs font-bold uppercase tracking-wider block">
-                              Courier Partner & AWB
+                              Manual Courier & AWB Override
                             </Label>
 
                             <div className="grid grid-cols-2 gap-2">
@@ -2329,6 +2471,17 @@ export default function Admin() {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
+                    variant="outline"
+                    className="text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                    onClick={() => {
+                      handleOpenLabelModal(previewOrder);
+                    }}
+                  >
+                    <Printer className="h-3.5 w-3.5" /> Print Label
+                  </Button>
+
+                  <Button
+                    size="sm"
                     variant="ghost"
                     className="text-xs text-muted-foreground hover:text-foreground"
                     asChild
@@ -2547,6 +2700,19 @@ export default function Admin() {
           </div>,
           document.body
         )}
+
+        {/* Amazon-Standard Shipping Label Modal */}
+        <ShippingLabelModal
+          open={!!activeLabelOrder}
+          onOpenChange={(open) => {
+            if (!open) {
+              setActiveLabelOrder(null);
+              setActiveShipmentData(null);
+            }
+          }}
+          order={activeLabelOrder}
+          shipmentData={activeShipmentData}
+        />
       </div>
     </Layout>
   );

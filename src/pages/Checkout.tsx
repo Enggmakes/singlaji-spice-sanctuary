@@ -24,6 +24,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { lookupPincode } from '@/lib/pincodeLookup';
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -100,9 +101,29 @@ export default function Checkout() {
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
+    const { name, value } = e.target;
+
+    // Auto-detect Indian state if 6-digit pincode is typed
+    if (name === 'pincode') {
+      const cleanPin = value.replace(/\D/g, '').slice(0, 6);
+      let detectedState = formData.state;
+      if (cleanPin.length === 6) {
+        const info = lookupPincode(cleanPin);
+        if (info.state && info.state !== 'India') {
+          detectedState = info.state;
+        }
+      }
+      setFormData((prev) => ({
+        ...prev,
+        pincode: cleanPin,
+        state: detectedState,
+      }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }));
   };
 
