@@ -143,7 +143,7 @@ export function ShippingLabelModal({
 
   const awb = shipmentData?.awb_code || order.tracking_number || '143263211700227';
   const courier = shipmentData?.courier_name || order.courier_name || 'Xpressbees Surface';
-  const routing = shipmentData?.routing_code || 'JAI/JMN';
+  const routing = shipmentData?.routing_code || 'ABH/PJB';
   const invoiceUrl = shipmentData?.invoice_url;
   const officialLabelUrl = shipmentData?.label_url;
 
@@ -375,11 +375,11 @@ export function ShippingLabelModal({
                   FSSAI Lic: 12224026000123
                 </span>
               </div>
-              <strong className="text-black text-[10px]">Singlaji Spice Sanctuary (Pure Spices)</strong>
+              <strong className="text-black text-[10px]">Singlaji Store (Pure Indian Spices)</strong>
               <br />
-              Shop No. 12, Spice Market Road, Near Clock Tower, Jaipur, Rajasthan - 302001
+              Nai Abadi St no. 17-18, Near Uttam Vihar Colony Gate no. 2, Abohar, Punjab - 152116
               <br />
-              Customer Support: +91 98765 43210 | www.singlaji.in
+              Customer Support / WhatsApp: +91 88725 72784 | singlaji2026@gmail.com | www.singlaji.in
             </div>
 
             {/* Footer Compliance Notice */}

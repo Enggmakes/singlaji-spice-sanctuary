@@ -903,7 +903,7 @@ export default function Admin() {
       channel_order_id: order.id,
       awb_code: tracking.awb || order.tracking_number || '143263211801491',
       courier_name: tracking.courier || order.courier_name || 'Xpressbees Surface',
-      routing_code: 'JAI/JMN',
+      routing_code: 'ABH/PJB',
     });
     setActiveLabelOrder(order);
   };

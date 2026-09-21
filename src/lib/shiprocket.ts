@@ -18,7 +18,7 @@ const DEFAULT_CONFIG: ShiprocketConfig = {
   email: 'workspace7204+api@gmail.com',
   password: '1f32b8af88f0e9f2a6bb3f84b8fb421e',
   mode: 'sandbox',
-  pickupLocation: 'Singlaji HQ',
+  pickupLocation: 'Singlaji Abohar HQ',
 };
 
 const TOKEN_STORAGE_KEY = 'singlaji_shiprocket_token';
@@ -198,7 +198,7 @@ export async function createAndAssignShipment(
     // 2. Assign Courier & AWB
     let awbCode = '';
     let courierName = 'Xpressbees Surface';
-    let routingCode = 'JAI/JMN';
+    let routingCode = 'ABH/PJB';
 
     const preferredCouriers = [24, 39, 10, 51, 1];
     for (const cid of preferredCouriers) {
@@ -266,7 +266,7 @@ export async function createAndAssignShipment(
       channel_order_id: `SINGLAJI-${(order.id || '').slice(0, 8).toUpperCase()}`,
       awb_code: mockAwb,
       courier_name: 'Xpressbees Surface',
-      routing_code: 'JAI/JMN',
+      routing_code: 'ABH/PJB',
       invoice_url: '',
     };
   }
