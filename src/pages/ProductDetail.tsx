@@ -130,15 +130,15 @@ export default function ProductDetail() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="relative aspect-[4/5] sm:aspect-square rounded-2xl overflow-hidden bg-secondary/30 shadow-card flex items-center justify-center p-4 sm:p-6 border border-border/40">
+            <div className="w-full max-w-[540px] mx-auto rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
               {product.image_url ? (
                 <img
                   src={product.image_url}
                   alt={product.name}
-                  className="w-full h-full max-h-[540px] object-contain drop-shadow-md transition-transform duration-300 hover:scale-105"
+                  className="w-full h-auto block object-cover transition-transform duration-500 hover:scale-[1.02]"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center">
+                <div className="aspect-square w-full flex items-center justify-center bg-secondary">
                   <span className="text-8xl font-serif text-muted-foreground/30">
                     {product.name.charAt(0)}
                   </span>
