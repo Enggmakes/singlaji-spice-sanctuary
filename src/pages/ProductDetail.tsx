@@ -114,21 +114,28 @@ export default function ProductDetail() {
 
   return (
     <Layout>
-      <div className="relative min-h-[85vh] overflow-hidden">
-        {/* Ambient Mobile Background Image */}
+      {/* 1. Main Product Section with Proportional Ambient Framing Background */}
+      <section className="relative overflow-hidden">
+        {/* Ambient Mobile Background Image (9:16 vertical ratio, 100% width, never stretched) */}
         <div
-          className="block sm:hidden absolute inset-0 z-0 pointer-events-none bg-cover bg-top bg-no-repeat opacity-20"
-          style={{ backgroundImage: `url('/product_page_mobile.png')` }}
+          className="block sm:hidden absolute top-0 left-0 w-full h-[750px] pointer-events-none bg-no-repeat bg-top opacity-25 z-0"
+          style={{
+            backgroundImage: `url('/product_page_mobile.png')`,
+            backgroundSize: '100% auto',
+          }}
         />
-        {/* Ambient Laptop / Desktop Horizontal Background Image */}
+        {/* Ambient Laptop / Desktop Horizontal Background Image (16:9 ratio, top-centered, never stretched) */}
         <div
-          className="hidden sm:block absolute inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat opacity-20"
-          style={{ backgroundImage: `url('/product_page_back.png')` }}
+          className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1672px] h-[850px] pointer-events-none bg-no-repeat bg-top opacity-20 z-0"
+          style={{
+            backgroundImage: `url('/product_page_back.png')`,
+            backgroundSize: '100% auto',
+          }}
         />
-        {/* Soft bottom fade to seamlessly blend into background */}
-        <div className="absolute inset-x-0 bottom-0 h-40 pointer-events-none bg-gradient-to-t from-background via-background/50 to-transparent z-0" />
+        {/* Soft bottom fade to blend smoothly into page background */}
+        <div className="absolute inset-x-0 bottom-0 h-32 pointer-events-none bg-gradient-to-t from-background via-background/50 to-transparent z-0" />
 
-        <div className="container mx-auto px-4 py-4 sm:py-8 md:py-12 relative z-10">
+        <div className="container mx-auto px-4 py-4 sm:py-8 md:py-10 relative z-10">
           {/* Breadcrumb */}
           <nav className="mb-4 sm:mb-8">
             <Link
@@ -351,22 +358,24 @@ export default function ProductDetail() {
             </div>
           </motion.div>
         </div>
-
-        {/* Related Products */}
-        {related.length > 0 && (
-          <section className="mt-16 md:mt-24">
-            <h2 className="text-2xl md:text-3xl font-serif font-bold mb-8">
-              You May Also Like
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {related.map((product, index) => (
-                <ProductCard key={product.id} product={product} index={index} />
-              ))}
-            </div>
-          </section>
-        )}
-        </div>
       </div>
-    </Layout>
+    </section>
+
+    {/* 2. Related Products / Recommendations Section */}
+    {related.length > 0 && (
+      <section className="py-12 md:py-16 border-t border-border/40 bg-secondary/25">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl md:text-3xl font-serif font-bold mb-8">
+            You May Also Like
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {related.map((product, index) => (
+              <ProductCard key={product.id} product={product} index={index} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
+  </Layout>
   );
 }
