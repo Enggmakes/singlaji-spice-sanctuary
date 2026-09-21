@@ -641,9 +641,9 @@ export default function Admin() {
     loadCoupons();
     fetchOrders();
 
-    // SUPABASE REALTIME SUBSCRIPTION FOR LIVE ORDERS
+    // SUPABASE REALTIME SUBSCRIPTION FOR LIVE ORDERS, PRODUCTS & CATEGORIES
     const channel = supabase
-      .channel('admin_orders_realtime')
+      .channel('admin_dashboard_realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
@@ -658,12 +658,46 @@ export default function Admin() {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          fetchProducts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'categories' },
+        () => {
+          fetchCategories();
+        }
+      )
+      .on('broadcast', { event: 'product_changed' }, () => {
+        fetchProducts();
+      })
+      .on('broadcast', { event: 'category_changed' }, () => {
+        fetchCategories();
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [isAdmin]);
+
+  // Instant broadcast helper to notify all customer browsers and devices immediately
+  const broadcastStoreUpdate = (event: 'product_changed' | 'category_changed' | 'coupon_changed') => {
+    try {
+      const ch = supabase.channel('store_fast_broadcast');
+      ch.send({
+        type: 'broadcast',
+        event,
+        payload: { timestamp: Date.now() },
+      });
+    } catch (err) {
+      console.warn('Store update broadcast error:', err);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoadingOrders(true);
@@ -846,6 +880,9 @@ export default function Admin() {
       toast.success('Category added');
       setNewCategoryName('');
       fetchCategories();
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      broadcastStoreUpdate('category_changed');
     } catch (err: any) {
       console.error('Error adding category:', err);
       toast.error(err.message || 'Failed to add category');
@@ -980,6 +1017,7 @@ export default function Admin() {
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product'] });
+      broadcastStoreUpdate('product_changed');
     } catch (err: any) {
       console.error('Failed to add product:', err);
       toast.error(err.message || 'Failed to add product');
@@ -1078,6 +1116,7 @@ export default function Admin() {
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product'] });
+      broadcastStoreUpdate('product_changed');
     } catch (err: any) {
       console.error('Failed to update product:', err);
       toast.error(err.message || 'Failed to update product');
@@ -1101,6 +1140,7 @@ export default function Admin() {
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product'] });
+      broadcastStoreUpdate('product_changed');
     } catch (err: any) {
       console.error('Error deleting product:', err);
       toast.error(err.message || 'Failed to delete product');
@@ -1160,6 +1200,8 @@ export default function Admin() {
       await toggleCouponActive(id, !currentStatus);
       toast.success(`Coupon status updated`);
       await loadCoupons();
+      queryClient.invalidateQueries({ queryKey: ['coupons'] });
+      broadcastStoreUpdate('coupon_changed');
     } catch (err) {
       toast.error('Failed to update coupon status');
     }
@@ -1171,6 +1213,8 @@ export default function Admin() {
       await deleteCoupon(id);
       toast.success(`Coupon '${code}' deleted`);
       await loadCoupons();
+      queryClient.invalidateQueries({ queryKey: ['coupons'] });
+      broadcastStoreUpdate('coupon_changed');
     } catch (err) {
       toast.error('Failed to delete coupon');
     }

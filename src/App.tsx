@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ScrollToTop from "@/components/common/ScrollToTop";
+import RealtimeSync from "@/components/common/RealtimeSync";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -34,6 +35,7 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <RealtimeSync />
     <TooltipProvider>
       <AuthProvider>
         <CartProvider>
