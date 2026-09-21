@@ -251,6 +251,17 @@ function WeightVariantsEditor({
     }
   };
 
+  const handleRemoveVariant = (index: number) => {
+    const removed = variants[index];
+    const next = variants.filter((_, i) => i !== index);
+    onVariantsChange(next);
+    if (removed && removed.weight) {
+      setSelectedSizes((prev) =>
+        prev.filter((s) => s.trim().toLowerCase() !== removed.weight.trim().toLowerCase())
+      );
+    }
+  };
+
   const handleAddCustomSize = () => {
     const defaultP = parseFloat(price) || 100;
     const next = [...variants, { weight: '', price: defaultP }];
@@ -470,7 +481,11 @@ function WeightVariantsEditor({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleRemoveVariant(idx)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveVariant(idx);
+                    }}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     title="Remove pack size"
                   >
