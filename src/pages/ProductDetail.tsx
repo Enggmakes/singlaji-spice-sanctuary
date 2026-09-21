@@ -122,22 +122,22 @@ export default function ProductDetail() {
           </Link>
         </nav>
 
-        {/* Product Details */}
-        <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col md:flex-row items-start justify-center gap-6 lg:gap-10">
+        {/* Product Details Showcase */}
+        <div className="max-w-6xl mx-auto bg-card/70 backdrop-blur-sm rounded-3xl p-6 sm:p-8 lg:p-12 border border-border/50 shadow-soft">
+          <div className="grid md:grid-cols-12 gap-8 lg:gap-14 items-start">
             {/* Image */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="w-full md:w-[380px] shrink-0 flex justify-center"
+              className="md:col-span-5 flex justify-center"
             >
-              <div className="w-full max-w-[380px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+              <div className="w-full max-w-[440px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-auto max-h-[500px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                    className="w-full h-auto max-h-[560px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
                   />
                 ) : (
                   <div className="aspect-square w-full flex items-center justify-center bg-secondary">
@@ -154,7 +154,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex-1 min-w-0 max-w-lg w-full flex flex-col pt-1"
+              className="md:col-span-7 flex flex-col justify-center w-full"
             >
             {/* Category */}
             {product.category && (
