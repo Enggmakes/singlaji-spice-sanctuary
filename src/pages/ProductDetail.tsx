@@ -115,25 +115,23 @@ export default function ProductDetail() {
   return (
     <Layout>
       {/* 1. Main Product Section with Proportional Ambient Framing Background */}
-      <section className="relative overflow-hidden">
-        {/* Ambient Mobile Background Image (9:16 vertical ratio, 100% width, never stretched) */}
+      <section className="relative overflow-hidden min-h-[750px] sm:min-h-[820px] lg:min-h-[920px] pb-12 sm:pb-16">
+        {/* Ambient Mobile Background Image (9:16 vertical ratio, 100% width, never sliced) */}
         <div
-          className="block sm:hidden absolute top-0 left-0 w-full h-[750px] pointer-events-none bg-no-repeat bg-top opacity-25 z-0"
+          className="block sm:hidden absolute inset-0 w-full pointer-events-none bg-no-repeat bg-top opacity-30 z-0"
           style={{
             backgroundImage: `url('/product_page_mobile.png')`,
             backgroundSize: '100% auto',
           }}
         />
-        {/* Ambient Laptop / Desktop Horizontal Background Image (16:9 ratio, top-centered, never stretched) */}
+        {/* Ambient Laptop / Desktop Horizontal Background Image (16:9 ratio, natural proportions, never sliced) */}
         <div
-          className="hidden sm:block absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1672px] h-[850px] pointer-events-none bg-no-repeat bg-top opacity-20 z-0"
+          className="hidden sm:block absolute inset-0 left-1/2 -translate-x-1/2 w-full max-w-[1672px] pointer-events-none bg-no-repeat bg-top opacity-35 z-0"
           style={{
             backgroundImage: `url('/product_page_back.png')`,
             backgroundSize: '100% auto',
           }}
         />
-        {/* Soft bottom fade to blend smoothly into page background */}
-        <div className="absolute inset-x-0 bottom-0 h-32 pointer-events-none bg-gradient-to-t from-background via-background/50 to-transparent z-0" />
 
         <div className="container mx-auto px-4 py-4 sm:py-8 md:py-10 relative z-10">
           {/* Breadcrumb */}
