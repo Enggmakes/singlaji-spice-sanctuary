@@ -18,8 +18,9 @@ $description = "Discover authentic, aromatic Indian masalas & spices from Abohar
 $imageUrl = $siteBase . "/og-preview.jpg";
 $pageType = "website";
 
-// Check if visiting a product page: /products/{slug}
-if (preg_match('#^/products/([a-zA-Z0-9_-]+)#', $requestUri, $matches)) {
+// Check if visiting a product page: /product/{slug} or /products/{slug}
+$cleanPath = parse_url($requestUri, PHP_URL_PATH) ?? $requestUri;
+if (preg_match('#^/products?/([a-zA-Z0-9_-]+)#', $cleanPath, $matches)) {
     $slug = $matches[1];
     $apiUrl = $supabaseUrl . "/rest/v1/products?slug=eq." . urlencode($slug) . "&select=name,price,description,image_url&limit=1";
 
