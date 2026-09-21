@@ -36,6 +36,10 @@ export default function ProductDetail() {
     }
   }, [product?.id, product?.weight, product?.price]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [slug]);
+
   const activePrice = selectedVariant ? selectedVariant.price : product?.price || 0;
   const selectedWeightLabel = selectedVariant ? selectedVariant.weight : product?.weight;
 
