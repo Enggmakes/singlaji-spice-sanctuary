@@ -41,7 +41,7 @@ export function parseWeightVariants(
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+        const list = parsed
           .filter(
             (v): v is { weight: any; price: any } =>
               v && typeof v === 'object' && 'weight' in v
@@ -51,6 +51,7 @@ export function parseWeightVariants(
             price: Number(v.price) > 0 ? Number(v.price) : fallbackPrice,
           }))
           .filter((v) => v.weight.length > 0);
+        return sortVariantsByWeight(list);
       }
     } catch {
       // invalid JSON, fall through
@@ -176,6 +177,20 @@ export function calculateVariantPrice(
 }
 
 /**
+ * Sorts weight variants in ascending order of their weight in grams
+ */
+export function sortVariantsByWeight(variants: WeightVariant[]): WeightVariant[] {
+  return [...variants].sort((a, b) => {
+    const gA = parseGrams(a.weight);
+    const gB = parseGrams(b.weight);
+    if (gA === 0 && gB === 0) return a.weight.localeCompare(b.weight);
+    if (gA === 0) return 1;
+    if (gB === 0) return -1;
+    return gA - gB;
+  });
+}
+
+/**
  * Generates an array of WeightVariants based on an anchor rate and target weight list
  */
 export function generateVariantsFromRate(
@@ -183,9 +198,10 @@ export function generateVariantsFromRate(
   baseWeightStr: string,
   targetWeights: string[]
 ): WeightVariant[] {
-  return targetWeights.map((w) => ({
+  const list = targetWeights.map((w) => ({
     weight: w,
     price: calculateVariantPrice(basePrice, baseWeightStr, w),
   }));
+  return sortVariantsByWeight(list);
 }
 

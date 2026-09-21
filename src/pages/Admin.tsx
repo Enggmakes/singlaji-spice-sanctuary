@@ -49,6 +49,7 @@ import {
   generateVariantsFromRate,
   calculateVariantPrice,
   parseGrams,
+  sortVariantsByWeight,
   WeightVariant,
 } from '@/lib/weightVariants';
 import { toast } from 'sonner';
@@ -226,14 +227,28 @@ function WeightVariantsEditor({
 
   const handleUpdateVariant = (index: number, field: 'weight' | 'price', val: any) => {
     const next = [...variants];
-    next[index] = { ...next[index], [field]: val };
+    if (field === 'weight') {
+      const weightStr = String(val);
+      next[index] = { ...next[index], weight: weightStr };
+      // Real-time calculation: dynamically calculate price as admin types e.g. "600gm", "1.5kg"
+      const grams = parseGrams(weightStr);
+      const baseP = parseFloat(price);
+      if (grams > 0 && baseP > 0) {
+        const autoPrice = calculateVariantPrice(baseP, rateWeight, weightStr);
+        next[index].price = autoPrice;
+      }
+    } else {
+      next[index] = { ...next[index], [field]: val };
+    }
     onVariantsChange(next);
   };
 
-  const handleRemoveVariant = (index: number) => {
-    const next = variants.filter((_, i) => i !== index);
-    onVariantsChange(next);
-    setSelectedSizes(next.map((v) => v.weight));
+  const handleBlurWeight = () => {
+    // When admin finishes typing, automatically sort variants ascending by weight (e.g. 500gm < 600gm < 1kg)
+    if (variants.length > 1) {
+      const sorted = sortVariantsByWeight(variants);
+      onVariantsChange(sorted);
+    }
   };
 
   const handleAddCustomSize = () => {
@@ -429,7 +444,8 @@ function WeightVariantsEditor({
                   <Input
                     value={v.weight}
                     onChange={(e) => handleUpdateVariant(idx, 'weight', e.target.value)}
-                    placeholder="e.g. 250gm, 1kg"
+                    onBlur={handleBlurWeight}
+                    placeholder="e.g. 250gm, 600gm, 1kg"
                     className="h-8 text-xs font-medium"
                   />
                 </div>
