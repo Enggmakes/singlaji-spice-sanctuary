@@ -21,7 +21,7 @@ export default function Index() {
   return (
     <Layout>
       {/* Hero Section */}
-      <section className="relative min-h-[70vh] md:min-h-[80vh] flex items-center overflow-hidden">
+      <section className="relative min-h-[75vh] md:min-h-[80vh] flex items-center pt-8 pb-12 sm:pt-12 sm:pb-16 md:py-24 overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0">
           <img
@@ -29,35 +29,35 @@ export default function Index() {
             alt="Premium Indian Spices"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-foreground/80 via-foreground/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-foreground/85 via-foreground/65 to-transparent" />
         </div>
 
         {/* Content */}
         <div className="container mx-auto px-4 relative z-10">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.7 }}
             className="max-w-2xl"
           >
-            <span className="inline-block px-4 py-1.5 bg-accent/90 text-accent-foreground text-sm font-medium rounded-full mb-6">
+            <span className="inline-block px-3.5 py-1 sm:px-4 sm:py-1.5 bg-accent/90 text-accent-foreground text-xs sm:text-sm font-medium rounded-full mb-3 sm:mb-5">
               Premium Indian Spices
             </span>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-primary-foreground leading-tight mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-primary-foreground leading-tight mb-4 sm:mb-6">
               Authentic Flavors,{' '}
               <span className="text-accent">Straight from India</span>
             </h1>
-            <p className="text-lg md:text-xl text-primary-foreground/90 mb-8 leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-primary-foreground/90 mb-6 sm:mb-8 leading-relaxed max-w-xl">
               Experience the rich heritage of Indian cuisine with Singlaji's 
               handpicked, stone-ground masalas. Pure tradition, exceptional taste.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button asChild variant="hero" size="xl">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <Button asChild variant="hero" size="lg" className="sm:size-xl text-base">
                 <Link to="/products">
-                  Shop Now <ArrowRight className="ml-2 h-5 w-5" />
+                  Shop Now <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="xl" className="bg-primary-foreground/10 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground">
+              <Button asChild variant="outline" size="lg" className="sm:size-xl text-base bg-primary-foreground/10 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground">
                 <Link to="/about">Our Story</Link>
               </Button>
             </div>
@@ -195,12 +195,12 @@ export default function Index() {
       )}
 
       {/* Brand Story */}
-      <section className="py-16 md:py-24">
+      <section className="py-16 md:py-24 overflow-hidden">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
             >
@@ -234,8 +234,8 @@ export default function Index() {
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
               className="relative"

@@ -635,8 +635,8 @@ export default function Checkout() {
 
           {/* Order Summary & Coupon Breakdown */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             className="lg:sticky lg:top-28 h-fit space-y-4"
           >
             {/* Quick Coupon in Checkout */}

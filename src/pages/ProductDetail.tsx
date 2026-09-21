@@ -139,8 +139,8 @@ export default function ProductDetail() {
           <div className="grid lg:grid-cols-2 gap-6 lg:gap-14 xl:gap-16 items-start">
             {/* Image */}
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
               className="flex justify-center lg:justify-center"
             >
@@ -163,8 +163,8 @@ export default function ProductDetail() {
 
           {/* Info */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
             className="flex flex-col"
           >
