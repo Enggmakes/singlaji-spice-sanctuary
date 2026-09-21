@@ -6,6 +6,8 @@ import { useCart } from '@/contexts/CartContext';
 import { Product } from '@/types';
 import { useState } from 'react';
 
+import { parseWeightVariants, formatVariantPriceDisplay } from '@/lib/weightVariants';
+
 interface ProductCardProps {
   product: Product;
   index?: number;
@@ -15,6 +17,10 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
 
+  const variants = parseWeightVariants(product.weight, product.price);
+  const hasMultipleVariants = variants.length > 1;
+  const priceDisplay = formatVariantPriceDisplay(variants, product.price);
+
   const discount = product.compare_at_price
     ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
     : 0;
@@ -22,7 +28,8 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(product, quantity);
+    const defaultVariant = variants[0];
+    addItem(product, quantity, defaultVariant?.weight, defaultVariant?.price);
     setQuantity(1);
   };
 
@@ -86,15 +93,28 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
             {product.name}
           </h3>
           
-          {/* Weight */}
-          {product.weight && (
+          {/* Weight / Pack Sizes */}
+          {hasMultipleVariants ? (
+            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+              {variants.map((v) => (
+                <span
+                  key={v.weight}
+                  className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border/40"
+                >
+                  {v.weight}
+                </span>
+              ))}
+            </div>
+          ) : variants[0]?.weight ? (
+            <p className="text-sm text-muted-foreground mt-1">{variants[0].weight}</p>
+          ) : product.weight ? (
             <p className="text-sm text-muted-foreground mt-1">{product.weight}</p>
-          )}
+          ) : null}
 
           {/* Price */}
           <div className="flex items-baseline gap-2 mt-3">
             <span className="text-xl font-semibold text-primary">
-              ₹{product.price.toFixed(0)}
+              {priceDisplay.formatted}
             </span>
             {product.compare_at_price && (
               <span className="text-sm text-muted-foreground line-through">

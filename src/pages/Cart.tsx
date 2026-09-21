@@ -112,15 +112,19 @@ export default function Cart() {
           <div className="lg:col-span-2 space-y-4">
             {items.map((item, index) => (
               <motion.div
-                key={item.product.id}
-                initial={{ opacity: 0, y: 20 }}
+                key={`${item.product.id}_${item.selectedWeight || 'default'}`}
+                layout
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-card rounded-xl p-4 md:p-6 shadow-card border border-border flex gap-4"
+                exit={{ opacity: 0, y: -10 }}
+                className="flex gap-4 p-4 bg-card rounded-xl shadow-soft border border-border"
               >
                 {/* Image */}
-                <Link to={`/product/${item.product.slug}`} className="shrink-0">
-                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden bg-secondary border border-border">
+                <Link
+                  to={`/product/${item.product.slug}`}
+                  className="w-24 h-24 rounded-lg overflow-hidden bg-secondary shrink-0"
+                >
+                  <div className="w-full h-full">
                     {item.product.image_url ? (
                       <img
                         src={item.product.image_url}
@@ -145,13 +149,17 @@ export default function Cart() {
                   >
                     {item.product.name}
                   </Link>
-                  {item.product.weight && (
+                  {item.selectedWeight ? (
+                    <span className="inline-block text-xs font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full mt-1">
+                      Pack: {item.selectedWeight}
+                    </span>
+                  ) : item.product.weight ? (
                     <p className="text-sm text-muted-foreground">
                       {item.product.weight}
                     </p>
-                  )}
-                  <p className="text-lg font-semibold text-primary mt-2">
-                    ₹{item.product.price.toFixed(0)}
+                  ) : null}
+                  <p className="text-lg font-semibold text-primary mt-1">
+                    ₹{(item.price ?? item.product.price).toFixed(0)}
                   </p>
                 </div>
 
@@ -161,7 +169,7 @@ export default function Cart() {
                     variant="ghost"
                     size="icon"
                     className="text-muted-foreground hover:text-destructive"
-                    onClick={() => removeItem(item.product.id)}
+                    onClick={() => removeItem(item.product.id, item.selectedWeight)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -169,7 +177,11 @@ export default function Cart() {
                   <div className="flex items-center border border-border rounded-lg bg-background">
                     <button
                       onClick={() =>
-                        updateQuantity(item.product.id, item.quantity - 1)
+                        updateQuantity(
+                          item.product.id,
+                          item.quantity - 1,
+                          item.selectedWeight
+                        )
                       }
                       className="p-2 hover:bg-muted transition-colors rounded-l-lg"
                     >
@@ -180,7 +192,11 @@ export default function Cart() {
                     </span>
                     <button
                       onClick={() =>
-                        updateQuantity(item.product.id, item.quantity + 1)
+                        updateQuantity(
+                          item.product.id,
+                          item.quantity + 1,
+                          item.selectedWeight
+                        )
                       }
                       className="p-2 hover:bg-muted transition-colors rounded-r-lg"
                       disabled={item.quantity >= item.product.stock}

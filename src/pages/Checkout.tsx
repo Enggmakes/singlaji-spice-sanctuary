@@ -196,13 +196,15 @@ export default function Checkout() {
 
       if (orderError) throw orderError;
 
-      // Create order items
+      // Create order items with explicit weight variant name and custom price
       const orderItems = items.map((item) => ({
         order_id: newOrderId,
         product_id: item.product?.id || null,
-        product_name: item.product.name,
+        product_name: item.selectedWeight
+          ? `${item.product.name} (${item.selectedWeight})`
+          : item.product.name,
         quantity: item.quantity,
-        price: item.product.price,
+        price: item.price ?? item.product.price,
       }));
 
       const { error: itemsError } = await supabase
@@ -247,7 +249,7 @@ export default function Checkout() {
     const orderText = items
       .map(
         (item) =>
-          `${item.quantity}x ${item.product.name} - ₹${(item.product.price * item.quantity).toFixed(0)}`
+          `${item.quantity}x ${item.product.name}${item.selectedWeight ? ` (${item.selectedWeight})` : ''} - ₹${(((item.price ?? item.product.price)) * item.quantity).toFixed(0)}`
       )
       .join('\n');
 
@@ -697,7 +699,10 @@ export default function Checkout() {
 
               <div className="space-y-4 mb-6 max-h-60 overflow-y-auto pr-1">
                 {items.map((item) => (
-                  <div key={item.product.id} className="flex gap-3">
+                  <div
+                    key={`${item.product.id}_${item.selectedWeight || 'default'}`}
+                    className="flex gap-3"
+                  >
                     <div className="w-14 h-14 rounded-lg overflow-hidden bg-secondary border border-border shrink-0">
                       {item.product.image_url ? (
                         <img
@@ -718,11 +723,16 @@ export default function Checkout() {
                         {item.product.name}
                       </p>
                       <p className="text-xs text-muted-foreground">
+                        {item.selectedWeight && (
+                          <span className="font-semibold text-primary">
+                            {item.selectedWeight} •{' '}
+                          </span>
+                        )}
                         Qty: {item.quantity}
                       </p>
                     </div>
                     <p className="font-medium text-sm">
-                      ₹{(item.product.price * item.quantity).toFixed(0)}
+                      ₹{(((item.price ?? item.product.price)) * item.quantity).toFixed(0)}
                     </p>
                   </div>
                 ))}

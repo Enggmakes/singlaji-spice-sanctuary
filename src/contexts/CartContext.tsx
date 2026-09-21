@@ -5,9 +5,18 @@ import { fetchCoupons, calculateCouponDiscount } from '@/lib/couponService';
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (product: Product, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (
+    product: Product,
+    quantity?: number,
+    selectedWeight?: string,
+    unitPrice?: number
+  ) => void;
+  removeItem: (productId: string, selectedWeight?: string) => void;
+  updateQuantity: (
+    productId: string,
+    quantity: number,
+    selectedWeight?: string
+  ) => void;
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
@@ -47,33 +56,75 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [appliedCoupon]);
 
-  const addItem = (product: Product, quantity = 1) => {
+  const addItem = (
+    product: Product,
+    quantity = 1,
+    selectedWeight?: string,
+    unitPrice?: number
+  ) => {
+    const effectivePrice = unitPrice !== undefined ? unitPrice : product.price;
+
     setItems((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+      const matchIndex = prev.findIndex(
+        (item) =>
+          item.product.id === product.id &&
+          (item.selectedWeight || '') === (selectedWeight || '')
+      );
+
+      if (matchIndex >= 0) {
+        return prev.map((item, idx) =>
+          idx === matchIndex
+            ? {
+                ...item,
+                quantity: item.quantity + quantity,
+                price: effectivePrice,
+              }
             : item
         );
       }
-      return [...prev, { product, quantity }];
+
+      return [
+        ...prev,
+        {
+          product,
+          quantity,
+          selectedWeight,
+          price: effectivePrice,
+        },
+      ];
     });
   };
 
-  const removeItem = (productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product.id !== productId));
+  const removeItem = (productId: string, selectedWeight?: string) => {
+    setItems((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            item.product.id === productId &&
+            (selectedWeight === undefined ||
+              (item.selectedWeight || '') === selectedWeight)
+          )
+      )
+    );
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (
+    productId: string,
+    quantity: number,
+    selectedWeight?: string
+  ) => {
     if (quantity <= 0) {
-      removeItem(productId);
+      removeItem(productId, selectedWeight);
       return;
     }
     setItems((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
+      prev.map((item) => {
+        const isMatch =
+          item.product.id === productId &&
+          (selectedWeight === undefined ||
+            (item.selectedWeight || '') === selectedWeight);
+        return isMatch ? { ...item, quantity } : item;
+      })
     );
   };
 
@@ -84,7 +135,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => sum + (item.price ?? item.product.price) * item.quantity,
     0
   );
 

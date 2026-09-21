@@ -30,6 +30,8 @@ export interface Product {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedWeight?: string;
+  price?: number; // Custom unit price for the chosen weight variant
 }
 
 export interface Profile {

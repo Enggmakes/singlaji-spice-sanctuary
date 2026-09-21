@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package } from 'lucide-react';
@@ -8,6 +8,7 @@ import ProductCard from '@/components/product/ProductCard';
 import { useProduct, useProducts } from '@/hooks/useProducts';
 import { useCart } from '@/contexts/CartContext';
 import { useSEO } from '@/hooks/useSEO';
+import { parseWeightVariants, WeightVariant } from '@/lib/weightVariants';
 import { toast } from 'sonner';
 
 export default function ProductDetail() {
@@ -17,8 +18,22 @@ export default function ProductDetail() {
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
 
+  const variants = product ? parseWeightVariants(product.weight, product.price) : [];
+  const [selectedVariant, setSelectedVariant] = useState<WeightVariant | null>(null);
+
+  useEffect(() => {
+    if (variants.length > 0) {
+      setSelectedVariant(variants[0]);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [product?.id, product?.weight]);
+
+  const activePrice = selectedVariant ? selectedVariant.price : product?.price || 0;
+  const selectedWeightLabel = selectedVariant ? selectedVariant.weight : product?.weight;
+
   useSEO({
-    title: product ? `${product.name} (₹${Math.round(product.price)})` : undefined,
+    title: product ? `${product.name} (₹${Math.round(activePrice)})` : undefined,
     description: product?.description
       ? product.description.slice(0, 160)
       : product?.name
@@ -65,13 +80,23 @@ export default function ProductDetail() {
     );
   }
 
-  const discount = product.compare_at_price
-    ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
-    : 0;
+  const discount =
+    product.compare_at_price && product.compare_at_price > activePrice
+      ? Math.round(
+          ((product.compare_at_price - activePrice) /
+            product.compare_at_price) *
+            100
+        )
+      : 0;
 
   const handleAddToCart = () => {
-    addItem(product, quantity);
-    toast.success(`Added ${quantity} × ${product.name} to cart`);
+    if (!product) return;
+    addItem(product, quantity, selectedWeightLabel || undefined, activePrice);
+    toast.success(
+      `Added ${quantity} × ${product.name}${
+        selectedWeightLabel ? ` (${selectedWeightLabel})` : ''
+      } to cart`
+    );
   };
 
   const related = relatedProducts?.filter((p) => p.id !== product.id).slice(0, 4) || [];
@@ -133,21 +158,67 @@ export default function ProductDetail() {
             )}
 
             {/* Title */}
-            <h1 className="text-3xl md:text-4xl font-serif font-bold mb-2">
+            <h1 className="text-3xl md:text-4xl font-serif font-bold mb-3">
               {product.name}
             </h1>
 
-            {/* Weight */}
-            {product.weight && (
-              <p className="text-muted-foreground mb-4">{product.weight}</p>
-            )}
+            {/* Weight / Pack Size Variants */}
+            {variants.length > 0 ? (
+              <div className="mb-6 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Select Pack Size / Quantity
+                  </label>
+                  {selectedVariant && (
+                    <span className="text-xs font-semibold text-primary">
+                      Selected: {selectedVariant.weight}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {variants.map((v) => {
+                    const isSelected = selectedVariant?.weight === v.weight;
+                    return (
+                      <button
+                        key={v.weight}
+                        type="button"
+                        onClick={() => setSelectedVariant(v)}
+                        className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all border ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20'
+                            : 'bg-card text-foreground border-border hover:border-primary/40 hover:bg-muted/30'
+                        }`}
+                      >
+                        <span>{v.weight}</span>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
+                            isSelected
+                              ? 'bg-white/20 text-primary-foreground'
+                              : 'bg-muted text-muted-foreground group-hover:text-foreground'
+                          }`}
+                        >
+                          ₹{Math.round(v.price)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : product.weight ? (
+              <p className="text-muted-foreground mb-4 font-medium">{product.weight}</p>
+            ) : null}
 
             {/* Price */}
             <div className="flex items-baseline gap-3 mb-6">
               <span className="text-3xl font-bold text-primary">
-                ₹{product.price.toFixed(0)}
+                ₹{activePrice.toFixed(0)}
               </span>
-              {product.compare_at_price && (
+              {selectedWeightLabel && (
+                <span className="text-sm font-medium text-muted-foreground">
+                  ({selectedWeightLabel})
+                </span>
+              )}
+              {product.compare_at_price && product.compare_at_price > activePrice && (
                 <>
                   <span className="text-xl text-muted-foreground line-through">
                     ₹{product.compare_at_price.toFixed(0)}

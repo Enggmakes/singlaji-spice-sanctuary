@@ -39,6 +39,12 @@ import {
   deleteCoupon,
 } from '@/lib/couponService';
 import { compressImage } from '@/lib/imageCompressor';
+import {
+  parseWeightVariants,
+  serializeWeightVariants,
+  COMMON_WEIGHT_PRESETS,
+  WeightVariant,
+} from '@/lib/weightVariants';
 import { toast } from 'sonner';
 
 interface Category {
@@ -55,6 +61,7 @@ interface Product {
   image_url: string | null;
   category_id?: string;
   description?: string;
+  weight?: string;
 }
 
 interface OrderItem {
@@ -116,6 +123,143 @@ const getStepIndex = (status: string) => {
   return 0;
 };
 
+interface WeightVariantsEditorProps {
+  variants: WeightVariant[];
+  onChange: (variants: WeightVariant[]) => void;
+  basePrice: string | number;
+}
+
+function WeightVariantsEditor({ variants, onChange, basePrice }: WeightVariantsEditorProps) {
+  const handleAddPreset = (weight: string) => {
+    if (variants.some((v) => v.weight.toLowerCase() === weight.toLowerCase())) {
+      toast.info(`Size ${weight} is already in the list`);
+      return;
+    }
+    const defaultPrice = parseFloat(String(basePrice)) || 100;
+    onChange([...variants, { weight, price: defaultPrice }]);
+  };
+
+  const handleAddCustom = () => {
+    const defaultPrice = parseFloat(String(basePrice)) || 100;
+    onChange([...variants, { weight: '', price: defaultPrice }]);
+  };
+
+  const handleUpdate = (index: number, field: 'weight' | 'price', value: any) => {
+    const next = [...variants];
+    next[index] = { ...next[index], [field]: value };
+    onChange(next);
+  };
+
+  const handleRemove = (index: number) => {
+    onChange(variants.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <Label className="text-xs font-semibold text-foreground">
+            Weight Pack Sizes & Custom Pricing (Optional)
+          </Label>
+          <p className="text-[11px] text-muted-foreground">
+            Offer sizes like 100gm, 250gm, 500gm, 1kg with their own prices.
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={handleAddCustom}
+          className="text-xs h-7 gap-1 shrink-0 self-start sm:self-auto"
+        >
+          <Plus className="h-3 w-3" /> Add Custom Size
+        </Button>
+      </div>
+
+      {/* Quick Add Presets */}
+      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+        <span className="text-[11px] font-medium text-muted-foreground mr-1">Quick Add:</span>
+        {COMMON_WEIGHT_PRESETS.map((preset) => {
+          const isAdded = variants.some(
+            (v) => v.weight.trim().toLowerCase() === preset.toLowerCase()
+          );
+          return (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => handleAddPreset(preset)}
+              disabled={isAdded}
+              className={`text-[11px] px-2.5 py-1 rounded-md border font-medium transition-colors ${
+                isAdded
+                  ? 'bg-muted text-muted-foreground border-transparent cursor-not-allowed opacity-50'
+                  : 'bg-background hover:bg-primary/10 hover:text-primary hover:border-primary/40 border-border text-foreground'
+              }`}
+            >
+              + {preset}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Variants List */}
+      {variants.length > 0 && (
+        <div className="space-y-2 mt-2 pt-2 border-t border-border/50">
+          {variants.map((v, idx) => (
+            <div
+              key={idx}
+              className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border"
+            >
+              <div className="flex-1">
+                <Label className="text-[10px] text-muted-foreground block mb-0.5">
+                  Pack Size (e.g. 500gm)
+                </Label>
+                <Input
+                  value={v.weight}
+                  onChange={(e) => handleUpdate(idx, 'weight', e.target.value)}
+                  placeholder="e.g. 250gm, 1kg"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="w-28">
+                <Label className="text-[10px] text-muted-foreground block mb-0.5">
+                  Price (₹)
+                </Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={v.price}
+                  onChange={(e) =>
+                    handleUpdate(idx, 'price', parseFloat(e.target.value) || 0)
+                  }
+                  placeholder="₹"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemove(idx)}
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  title="Remove pack size"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium pt-1">
+            ✓ Storefront will display: From ₹
+            {Math.min(...variants.map((v) => v.price || 0))} with interactive size selector.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -149,6 +293,7 @@ export default function Admin() {
     category_id: string;
     description: string;
     image: File | null;
+    variants: WeightVariant[];
   }>({
     name: '',
     price: '',
@@ -156,6 +301,7 @@ export default function Admin() {
     category_id: '',
     description: '',
     image: null,
+    variants: [],
   });
 
   // Product Editing State
@@ -170,6 +316,7 @@ export default function Admin() {
     imageFile: File | null;
     currentImageUrl: string | null;
     previewUrl: string | null;
+    variants: WeightVariant[];
   }>({
     name: '',
     price: '',
@@ -179,6 +326,7 @@ export default function Admin() {
     imageFile: null,
     currentImageUrl: null,
     previewUrl: null,
+    variants: [],
   });
 
   const [couponForm, setCouponForm] = useState<{
@@ -333,7 +481,7 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price, stock, image_url, category_id, description')
+        .select('id, name, price, stock, image_url, category_id, description, weight')
         .order('created_at', { ascending: false });
       if (error) throw error;
       if (data) setProducts(data);
@@ -534,14 +682,21 @@ export default function Admin() {
         '-' +
         Date.now();
 
+      const validVariants = productForm.variants.filter((v) => v.weight.trim() && v.price > 0);
+      const weightData = serializeWeightVariants(validVariants);
+      const minVariantPrice = validVariants.length > 0
+        ? validVariants.reduce((min, v) => (v.price < min ? v.price : min), validVariants[0].price)
+        : parseFloat(productForm.price);
+
       const { error } = await supabase.from('products').insert({
         name: productForm.name,
         slug,
-        price: parseFloat(productForm.price),
+        price: minVariantPrice,
         stock: parseInt(productForm.stock) || 0,
         category_id: productForm.category_id,
         description: productForm.description,
         image_url,
+        weight: weightData || null,
       });
 
       if (error) throw error;
@@ -554,6 +709,7 @@ export default function Admin() {
         category_id: '',
         description: '',
         image: null,
+        variants: [],
       });
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -567,6 +723,7 @@ export default function Admin() {
 
   const handleOpenEditProduct = (prod: Product) => {
     setEditingProduct(prod);
+    const parsedVariants = parseWeightVariants(prod.weight, prod.price);
     setEditForm({
       name: prod.name,
       price: prod.price.toString(),
@@ -576,6 +733,7 @@ export default function Admin() {
       imageFile: null,
       currentImageUrl: prod.image_url,
       previewUrl: null,
+      variants: parsedVariants,
     });
   };
 
@@ -613,16 +771,23 @@ export default function Admin() {
         }
       }
 
+      const validVariants = editForm.variants.filter((v) => v.weight.trim() && v.price > 0);
+      const weightData = serializeWeightVariants(validVariants);
+      const minVariantPrice = validVariants.length > 0
+        ? validVariants.reduce((min, v) => (v.price < min ? v.price : min), validVariants[0].price)
+        : parseFloat(editForm.price);
+
       // 2. Update product in database
       const { error: updateError } = await supabase
         .from('products')
         .update({
           name: editForm.name.trim(),
-          price: parseFloat(editForm.price),
+          price: minVariantPrice,
           stock: parseInt(editForm.stock) || 0,
           category_id: editForm.category_id || null,
           description: editForm.description.trim() || null,
           image_url: finalImageUrl,
+          weight: weightData || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingProduct.id);
@@ -1200,7 +1365,7 @@ export default function Admin() {
                     </select>
                   </div>
                   <div>
-                    <Label>Price (₹) *</Label>
+                    <Label>Base Price (₹) *</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -1224,6 +1389,13 @@ export default function Admin() {
                     />
                   </div>
                 </div>
+
+                {/* Weight & Pricing Variants */}
+                <WeightVariantsEditor
+                  variants={productForm.variants}
+                  onChange={(variants) => setProductForm((prev) => ({ ...prev, variants }))}
+                  basePrice={productForm.price}
+                />
 
                 <div>
                   <Label>Description</Label>
@@ -1301,7 +1473,16 @@ export default function Admin() {
                           {prod.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          ₹{prod.price} | Stock: {prod.stock}
+                          ₹{prod.price}{' '}
+                          {(() => {
+                            const v = parseWeightVariants(prod.weight, prod.price);
+                            return v.length > 1
+                              ? `(${v.length} pack sizes)`
+                              : prod.weight
+                              ? `(${prod.weight})`
+                              : '';
+                          })()}{' '}
+                          | Stock: {prod.stock}
                         </p>
                       </div>
                     </div>
@@ -1914,7 +2095,7 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <Label className="text-xs font-semibold">Price (₹) *</Label>
+                    <Label className="text-xs font-semibold">Base Price (₹) *</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -1937,6 +2118,13 @@ export default function Admin() {
                     className="mt-1"
                   />
                 </div>
+
+                {/* Weight & Pricing Variants */}
+                <WeightVariantsEditor
+                  variants={editForm.variants}
+                  onChange={(variants) => setEditForm((prev) => ({ ...prev, variants }))}
+                  basePrice={editForm.price}
+                />
 
                 <div>
                   <Label className="text-xs font-semibold">Description</Label>
