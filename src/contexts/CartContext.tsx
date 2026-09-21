@@ -74,6 +74,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const isSyncingFromCloudRef = useRef<boolean>(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const deviceId = useRef<string>(getDeviceId()).current;
+  const couponTimestampRef = useRef<number>(
+    (() => {
+      const savedTs = localStorage.getItem('singlaji-applied-coupon-timestamp');
+      return savedTs ? Number(savedTs) : 0;
+    })()
+  );
 
   const [items, setItems] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem('singlaji-cart');
@@ -91,12 +97,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await supabase.auth.getUser();
       const freshCloud = data?.user?.user_metadata?.cart_items;
+      const freshCloudCoupon = data?.user?.user_metadata?.cart_coupon;
+      const freshCouponTs = Number(data?.user?.user_metadata?.cart_coupon_timestamp) || 0;
+
       if (Array.isArray(freshCloud)) {
         const localString = localStorage.getItem('singlaji-cart') || '[]';
         if (JSON.stringify(freshCloud) !== localString) {
           isSyncingFromCloudRef.current = true;
           setItems(freshCloud);
           localStorage.setItem('singlaji-cart', JSON.stringify(freshCloud));
+        }
+      }
+
+      // Conflict-free: Only apply cloud coupon if its timestamp is strictly newer
+      if (freshCouponTs > couponTimestampRef.current) {
+        couponTimestampRef.current = freshCouponTs;
+        setAppliedCoupon(freshCloudCoupon || null);
+        if (freshCloudCoupon) {
+          localStorage.setItem('singlaji-applied-coupon', JSON.stringify(freshCloudCoupon));
+          localStorage.setItem('singlaji-applied-coupon-timestamp', String(freshCouponTs));
+        } else {
+          localStorage.removeItem('singlaji-applied-coupon');
+          localStorage.setItem('singlaji-applied-coupon-timestamp', String(freshCouponTs));
         }
       }
     } catch {
@@ -127,12 +149,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       .on('broadcast', { event: 'cart_sync' }, ({ payload }) => {
         if (!payload || payload.senderId === deviceId) return;
 
+        // cart_sync handles cart items only so it never conflicts with applied coupons
         if (Array.isArray(payload.items)) {
           isSyncingFromCloudRef.current = true;
           setItems(payload.items);
           localStorage.setItem('singlaji-cart', JSON.stringify(payload.items));
-          if (payload.coupon !== undefined) {
-            setAppliedCoupon(payload.coupon);
+        }
+      })
+      .on('broadcast', { event: 'coupon_sync' }, ({ payload }) => {
+        if (!payload || payload.senderId === deviceId) return;
+
+        // Dedicated real-time coupon event from the other device with timestamp protection
+        const incomingTs = Number(payload.couponTimestamp) || 0;
+        if (incomingTs >= couponTimestampRef.current) {
+          couponTimestampRef.current = incomingTs;
+          setAppliedCoupon(payload.coupon || null);
+          if (payload.coupon) {
+            localStorage.setItem('singlaji-applied-coupon', JSON.stringify(payload.coupon));
+            localStorage.setItem('singlaji-applied-coupon-timestamp', String(incomingTs));
+          } else {
+            localStorage.removeItem('singlaji-applied-coupon');
+            localStorage.setItem('singlaji-applied-coupon-timestamp', String(incomingTs));
           }
         }
       })
@@ -169,7 +206,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: userData } = await supabase.auth.getUser();
         const cloudRaw = userData?.user?.user_metadata?.cart_items;
+        const cloudCoupon = userData?.user?.user_metadata?.cart_coupon;
+        const cloudCouponTs = Number(userData?.user?.user_metadata?.cart_coupon_timestamp) || 0;
         const cloudItems: CartItem[] = Array.isArray(cloudRaw) ? cloudRaw : [];
+
+        if (cloudCouponTs > couponTimestampRef.current) {
+          couponTimestampRef.current = cloudCouponTs;
+          setAppliedCoupon(cloudCoupon || null);
+          if (cloudCoupon) {
+            localStorage.setItem('singlaji-applied-coupon', JSON.stringify(cloudCoupon));
+            localStorage.setItem('singlaji-applied-coupon-timestamp', String(cloudCouponTs));
+          } else {
+            localStorage.removeItem('singlaji-applied-coupon');
+            localStorage.setItem('singlaji-applied-coupon-timestamp', String(cloudCouponTs));
+          }
+        } else if (couponTimestampRef.current > cloudCouponTs && appliedCoupon) {
+          supabase.auth.updateUser({
+            data: {
+              cart_coupon: appliedCoupon,
+              cart_coupon_timestamp: couponTimestampRef.current,
+            },
+          }).catch(console.warn);
+        }
 
         setItems((currentLocal) => {
           if (cloudItems.length > 0 && currentLocal.length === 0) {
@@ -251,7 +309,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         event: 'cart_sync',
         payload: {
           items,
-          coupon: appliedCoupon,
           senderId: deviceId,
           timestamp: Date.now(),
         },
@@ -358,8 +415,46 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearCart = () => {
+    const ts = Date.now();
+    couponTimestampRef.current = ts;
     setItems([]);
     setAppliedCoupon(null);
+    localStorage.removeItem('singlaji-cart');
+    localStorage.removeItem('singlaji-applied-coupon');
+    localStorage.setItem('singlaji-applied-coupon-timestamp', String(ts));
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'cart_sync',
+        payload: {
+          items: [],
+          senderId: deviceId,
+          timestamp: ts,
+        },
+      }).catch(console.warn);
+
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'coupon_sync',
+        payload: {
+          coupon: null,
+          couponTimestamp: ts,
+          senderId: deviceId,
+        },
+      }).catch(console.warn);
+    }
+
+    if (user) {
+      supabase.auth.updateUser({
+        data: {
+          cart_items: [],
+          cart_coupon: null,
+          cart_coupon_timestamp: ts,
+          cart_updated_at: ts,
+        },
+      }).catch(console.warn);
+    }
   };
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -417,7 +512,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           message: `Minimum order value of ₹${found.min_order_value} required for this coupon`,
         };
       }
+      const ts = Date.now();
+      couponTimestampRef.current = ts;
       setAppliedCoupon(found);
+      localStorage.setItem('singlaji-applied-coupon', JSON.stringify(found));
+      localStorage.setItem('singlaji-applied-coupon-timestamp', String(ts));
+
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'coupon_sync',
+          payload: {
+            coupon: found,
+            couponTimestamp: ts,
+            senderId: deviceId,
+          },
+        }).catch(console.warn);
+      }
+
+      if (user) {
+        supabase.auth.updateUser({
+          data: {
+            cart_coupon: found,
+            cart_coupon_timestamp: ts,
+          },
+        }).catch(console.warn);
+      }
+
       return {
         success: true,
         message: 'Free Shipping coupon applied successfully!',
@@ -429,7 +550,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return { success: false, message: validation.message };
     }
 
+    const ts = Date.now();
+    couponTimestampRef.current = ts;
     setAppliedCoupon(found);
+    localStorage.setItem('singlaji-applied-coupon', JSON.stringify(found));
+    localStorage.setItem('singlaji-applied-coupon-timestamp', String(ts));
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'coupon_sync',
+        payload: {
+          coupon: found,
+          couponTimestamp: ts,
+          senderId: deviceId,
+        },
+      }).catch(console.warn);
+    }
+
+    if (user) {
+      supabase.auth.updateUser({
+        data: {
+          cart_coupon: found,
+          cart_coupon_timestamp: ts,
+        },
+      }).catch(console.warn);
+    }
+
     return {
       success: true,
       message: `Coupon '${found.code}' applied! You saved ₹${validation.discount}`,
@@ -437,7 +584,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeCoupon = () => {
+    const ts = Date.now();
+    couponTimestampRef.current = ts;
     setAppliedCoupon(null);
+    localStorage.removeItem('singlaji-applied-coupon');
+    localStorage.setItem('singlaji-applied-coupon-timestamp', String(ts));
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'coupon_sync',
+        payload: {
+          coupon: null,
+          couponTimestamp: ts,
+          senderId: deviceId,
+        },
+      }).catch(console.warn);
+    }
+
+    if (user) {
+      supabase.auth.updateUser({
+        data: {
+          cart_coupon: null,
+          cart_coupon_timestamp: ts,
+        },
+      }).catch(console.warn);
+    }
   };
 
   return (
