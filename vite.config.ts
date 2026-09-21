@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/api/shiprocket': {
+        target: 'https://api-sandbox.shiprocket.in',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/shiprocket/, ''),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
