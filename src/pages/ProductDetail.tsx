@@ -115,29 +115,31 @@ export default function ProductDetail() {
   return (
     <Layout>
       {/* 1. Main Product Section with Proportional Ambient Framing Background */}
-      <section className="relative overflow-hidden min-h-[750px] sm:min-h-[820px] lg:min-h-[920px] pb-12 sm:pb-16">
-        {/* Ambient Mobile Background Image (9:16 vertical ratio, smoothly merged at bottom) */}
+      <section className="relative overflow-hidden pb-8 sm:pb-12">
+        {/* Ambient Mobile Background Image (9:16 vertical ratio, 12% subtle opacity) */}
         <div
-          className="block sm:hidden absolute inset-0 w-full pointer-events-none bg-no-repeat bg-top opacity-15 z-0"
+          className="block sm:hidden absolute inset-0 w-full pointer-events-none bg-no-repeat bg-top z-0"
           style={{
             backgroundImage: `url('/product_page_mobile.png')`,
             backgroundSize: '100% auto',
-            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 65%, rgba(0,0,0,0) 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 65%, rgba(0,0,0,0) 100%)',
+            opacity: 0.12,
+            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 80%, rgba(0,0,0,0) 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 80%, rgba(0,0,0,0) 100%)',
           }}
         />
-        {/* Ambient Laptop / Desktop Horizontal Background Image (16:9 ratio, smoothly merged at bottom) */}
+        {/* Ambient Laptop / Desktop Horizontal Background Image (16:9 ratio, 12% subtle opacity) */}
         <div
-          className="hidden sm:block absolute inset-0 left-1/2 -translate-x-1/2 w-full max-w-[1672px] pointer-events-none bg-no-repeat bg-top opacity-18 z-0"
+          className="hidden sm:block absolute inset-0 left-1/2 -translate-x-1/2 w-full max-w-[1672px] pointer-events-none bg-no-repeat bg-top z-0"
           style={{
             backgroundImage: `url('/product_page_back.png')`,
             backgroundSize: '100% auto',
-            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 70%, rgba(0,0,0,0) 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 70%, rgba(0,0,0,0) 100%)',
+            opacity: 0.12,
+            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)',
           }}
         />
 
-        <div className="container mx-auto px-4 py-4 sm:py-8 md:py-10 relative z-10">
+        <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 relative z-10">
           {/* Breadcrumb */}
           <nav className="mb-4 sm:mb-8">
             <Link
@@ -365,7 +367,7 @@ export default function ProductDetail() {
 
     {/* 2. Related Products / Recommendations Section */}
     {related.length > 0 && (
-      <section className="py-12 md:py-16 border-t border-border/20">
+      <section className="py-8 sm:py-12 border-t border-border/15">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-serif font-bold mb-8">
             You May Also Like
