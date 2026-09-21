@@ -967,6 +967,7 @@ export default function Admin() {
       });
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
     } catch (err: any) {
       console.error('Failed to add product:', err);
       toast.error(err.message || 'Failed to add product');
@@ -1064,6 +1065,7 @@ export default function Admin() {
       setEditingProduct(null);
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
     } catch (err: any) {
       console.error('Failed to update product:', err);
       toast.error(err.message || 'Failed to update product');
@@ -1086,6 +1088,7 @@ export default function Admin() {
       toast.success('Product deleted');
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product'] });
     } catch (err: any) {
       console.error('Error deleting product:', err);
       toast.error(err.message || 'Failed to delete product');

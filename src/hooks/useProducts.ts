@@ -87,6 +87,8 @@ export function useProduct(slug: string) {
       if (error) throw error;
       return data as Product;
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 

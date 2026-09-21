@@ -23,11 +23,18 @@ export default function ProductDetail() {
 
   useEffect(() => {
     if (variants.length > 0) {
-      setSelectedVariant(variants[0]);
+      // Re-sync current selected weight with new updated price from database
+      setSelectedVariant((prev) => {
+        if (prev) {
+          const match = variants.find((v) => v.weight.toLowerCase() === prev.weight.toLowerCase());
+          if (match) return match;
+        }
+        return variants[0];
+      });
     } else {
       setSelectedVariant(null);
     }
-  }, [product?.id, product?.weight]);
+  }, [product?.id, product?.weight, product?.price]);
 
   const activePrice = selectedVariant ? selectedVariant.price : product?.price || 0;
   const selectedWeightLabel = selectedVariant ? selectedVariant.weight : product?.weight;

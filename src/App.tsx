@@ -22,9 +22,10 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: 'always',
+      refetchOnReconnect: true,
+      staleTime: 0,
       retry: 1,
     },
   },
