@@ -113,13 +113,15 @@ export default function ProductDetail() {
       <div className="relative min-h-[85vh] overflow-hidden">
         {/* Ambient Product Page Background Image with Low Opacity */}
         <div
-          className="absolute inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat opacity-20"
+          className="absolute inset-0 z-0 pointer-events-none bg-cover bg-top sm:bg-center bg-no-repeat opacity-15 sm:opacity-20"
           style={{ backgroundImage: `url('/product_page_back.png')` }}
         />
+        {/* Soft bottom fade to seamlessly blend into background */}
+        <div className="absolute inset-x-0 bottom-0 h-40 pointer-events-none bg-gradient-to-t from-background via-background/50 to-transparent z-0" />
 
-        <div className="container mx-auto px-4 py-8 md:py-12 relative z-10">
+        <div className="container mx-auto px-4 py-4 sm:py-8 md:py-12 relative z-10">
           {/* Breadcrumb */}
-          <nav className="mb-8">
+          <nav className="mb-4 sm:mb-8">
             <Link
               to="/products"
               className="inline-flex items-center text-sm text-muted-foreground hover:text-primary transition-colors"
@@ -130,7 +132,7 @@ export default function ProductDetail() {
           </nav>
 
           {/* Product Details */}
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-14 xl:gap-16 items-start">
+          <div className="grid lg:grid-cols-2 gap-6 lg:gap-14 xl:gap-16 items-start">
             {/* Image */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -138,12 +140,12 @@ export default function ProductDetail() {
               transition={{ duration: 0.5 }}
               className="flex justify-center lg:justify-center"
             >
-              <div className="w-full max-w-[340px] sm:max-w-[370px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+              <div className="w-full max-w-[250px] sm:max-w-[320px] lg:max-w-[370px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-auto max-h-[500px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                    className="w-full h-auto max-h-[330px] sm:max-h-[420px] lg:max-h-[500px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
                   />
                 ) : (
                   <div className="aspect-square w-full flex items-center justify-center bg-secondary">
