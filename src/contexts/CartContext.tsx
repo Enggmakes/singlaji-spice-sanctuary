@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { CartItem, Product } from '@/types';
 import { Coupon } from '@/types/coupon';
 import { fetchCoupons, calculateCouponDiscount } from '@/lib/couponService';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CartContextType {
   items: CartItem[];
@@ -30,7 +32,33 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// Helper function to merge cloud cart and local cart items without duplicating
+function mergeCartItems(cloudItems: CartItem[], localItems: CartItem[]): CartItem[] {
+  const merged: CartItem[] = [...cloudItems];
+  for (const local of localItems) {
+    const matchIndex = merged.findIndex(
+      (item) =>
+        item.product.id === local.product.id &&
+        (item.selectedWeight || '') === (local.selectedWeight || '')
+    );
+    if (matchIndex >= 0) {
+      merged[matchIndex] = {
+        ...merged[matchIndex],
+        quantity: Math.max(merged[matchIndex].quantity, local.quantity),
+        price: local.price || merged[matchIndex].price,
+      };
+    } else {
+      merged.push(local);
+    }
+  }
+  return merged;
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const lastSyncedUserIdRef = useRef<string | null>(null);
+  const isSyncingFromCloudRef = useRef<boolean>(false);
+
   const [items, setItems] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem('singlaji-cart');
     return saved ? JSON.parse(saved) : [];
@@ -41,10 +69,110 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // 1. Initial Cloud Sync when User logs in or account changes
+  useEffect(() => {
+    if (!user) {
+      lastSyncedUserIdRef.current = null;
+      return;
+    }
+
+    if (lastSyncedUserIdRef.current === user.id) {
+      return;
+    }
+    lastSyncedUserIdRef.current = user.id;
+
+    const syncOnLogin = async () => {
+      try {
+        let cloudRaw = user.user_metadata?.cart_items;
+        if (!cloudRaw) {
+          const { data: userData } = await supabase.auth.getUser();
+          cloudRaw = userData?.user?.user_metadata?.cart_items;
+        }
+
+        const cloudItems: CartItem[] = Array.isArray(cloudRaw) ? cloudRaw : [];
+
+        setItems((currentLocal) => {
+          if (cloudItems.length > 0 && currentLocal.length === 0) {
+            isSyncingFromCloudRef.current = true;
+            localStorage.setItem('singlaji-cart', JSON.stringify(cloudItems));
+            return cloudItems;
+          }
+
+          if (currentLocal.length > 0 && cloudItems.length === 0) {
+            supabase.auth.updateUser({
+              data: { cart_items: currentLocal },
+            }).catch(console.warn);
+            return currentLocal;
+          }
+
+          if (cloudItems.length > 0 && currentLocal.length > 0) {
+            const merged = mergeCartItems(cloudItems, currentLocal);
+            isSyncingFromCloudRef.current = true;
+            localStorage.setItem('singlaji-cart', JSON.stringify(merged));
+            supabase.auth.updateUser({
+              data: { cart_items: merged },
+            }).catch(console.warn);
+            return merged;
+          }
+
+          return currentLocal;
+        });
+      } catch (err) {
+        console.warn('Cart sync on login error:', err);
+      }
+    };
+
+    syncOnLogin();
+  }, [user?.id]);
+
+  // 2. Real-time Multi-Device tab/window focus sync
+  useEffect(() => {
+    if (!user) return;
+
+    const handleFocus = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const freshCloud = data?.user?.user_metadata?.cart_items;
+        if (Array.isArray(freshCloud)) {
+          const localString = localStorage.getItem('singlaji-cart');
+          if (JSON.stringify(freshCloud) !== localString) {
+            isSyncingFromCloudRef.current = true;
+            setItems(freshCloud);
+            localStorage.setItem('singlaji-cart', JSON.stringify(freshCloud));
+          }
+        }
+      } catch {
+        // Silently catch tab focus check
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user?.id]);
+
+  // 3. Save to localStorage immediately and sync to Supabase Cloud (debounced)
   useEffect(() => {
     localStorage.setItem('singlaji-cart', JSON.stringify(items));
-  }, [items]);
 
+    if (isSyncingFromCloudRef.current) {
+      isSyncingFromCloudRef.current = false;
+      return;
+    }
+
+    if (!user) return;
+
+    const timer = setTimeout(() => {
+      supabase.auth.updateUser({
+        data: { cart_items: items },
+      }).catch((err) => {
+        console.warn('Failed to upload cart to cloud:', err);
+      });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [items, user?.id]);
+
+  // 4. Coupon persistence
   useEffect(() => {
     if (appliedCoupon) {
       localStorage.setItem(
