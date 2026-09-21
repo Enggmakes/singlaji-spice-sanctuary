@@ -161,7 +161,85 @@ export function ShippingLabelModal({
   const items = order.order_items || [];
 
   const handlePrint = () => {
-    window.print();
+    const labelNode = document.getElementById('printable-shipping-label');
+    if (!labelNode) {
+      window.print();
+      return;
+    }
+
+    const labelHtml = labelNode.outerHTML;
+    const printWindow = window.open('', '_blank', 'width=450,height=680');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Shipping_Label_${awb}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @page {
+              size: 100mm 150mm; /* Standard 4x6 inch label */
+              margin: 3mm;
+            }
+            @media print {
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                background: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              #printable-shipping-label {
+                width: 100% !important;
+                max-width: 96mm !important;
+                margin: 0 auto !important;
+                border: 2px solid #000000 !important;
+                page-break-inside: avoid !important;
+                box-shadow: none !important;
+              }
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              margin: 0;
+              padding: 6px;
+              display: flex;
+              justify-content: center;
+              align-items: flex-start;
+              background: #ffffff;
+              color: #000000;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            #printable-shipping-label {
+              width: 100%;
+              max-width: 380px;
+              background: #ffffff !important;
+              color: #000000 !important;
+              border: 2px solid #000000 !important;
+            }
+          </style>
+        </head>
+        <body>
+          ${labelHtml}
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.focus();
+                window.print();
+              }, 350);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   return (
@@ -212,29 +290,6 @@ export function ShippingLabelModal({
 
         {/* Printable Area */}
         <div className="p-6 max-h-[75vh] overflow-y-auto flex justify-center bg-zinc-100 dark:bg-zinc-950">
-          <style>{`
-            @media print {
-              body * {
-                visibility: hidden;
-              }
-              #printable-shipping-label, #printable-shipping-label * {
-                visibility: visible;
-              }
-              #printable-shipping-label {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                max-width: 400px;
-                margin: 0 auto;
-                box-shadow: none;
-                border: 2px solid #000 !important;
-                background: white !important;
-                color: black !important;
-              }
-            }
-          `}</style>
-
           <div
             id="printable-shipping-label"
             ref={printRef}
