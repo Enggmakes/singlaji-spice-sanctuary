@@ -122,40 +122,38 @@ export default function ProductDetail() {
           </Link>
         </nav>
 
-        {/* Product Details Showcase */}
-        <div className="max-w-6xl mx-auto bg-card/70 backdrop-blur-sm rounded-3xl p-6 sm:p-8 lg:p-12 border border-border/50 shadow-soft">
-          <div className="grid md:grid-cols-12 gap-8 lg:gap-14 items-start">
-            {/* Image */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-              className="md:col-span-5 flex justify-center"
-            >
-              <div className="w-full max-w-[440px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
-                {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-auto max-h-[560px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
-                  />
-                ) : (
-                  <div className="aspect-square w-full flex items-center justify-center bg-secondary">
-                    <span className="text-8xl font-serif text-muted-foreground/30">
-                      {product.name.charAt(0)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+        {/* Product Details */}
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Image */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="w-full max-w-[540px] mx-auto rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+              {product.image_url ? (
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-auto block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                />
+              ) : (
+                <div className="aspect-square w-full flex items-center justify-center bg-secondary">
+                  <span className="text-8xl font-serif text-muted-foreground/30">
+                    {product.name.charAt(0)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </motion.div>
 
-            {/* Info */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-              className="md:col-span-7 flex flex-col justify-center w-full"
-            >
+          {/* Info */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col"
+          >
             {/* Category */}
             {product.category && (
               <Link
@@ -334,7 +332,6 @@ export default function ProductDetail() {
             </div>
           </motion.div>
         </div>
-      </div>
 
         {/* Related Products */}
         {related.length > 0 && (
