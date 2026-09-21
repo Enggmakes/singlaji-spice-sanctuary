@@ -123,38 +123,39 @@ export default function ProductDetail() {
         </nav>
 
         {/* Product Details */}
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-          {/* Image */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="lg:col-span-5 flex justify-center lg:justify-start lg:sticky lg:top-24"
-          >
-            <div className="w-full max-w-[390px] rounded-2xl overflow-hidden shadow-card border border-border/40 bg-card">
-              {product.image_url ? (
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-full h-auto max-h-[520px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
-                />
-              ) : (
-                <div className="aspect-square w-full flex items-center justify-center bg-secondary">
-                  <span className="text-8xl font-serif text-muted-foreground/30">
-                    {product.name.charAt(0)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </motion.div>
+        <div className="max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 lg:gap-14 items-center justify-center">
+            {/* Image */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex justify-center md:justify-end"
+            >
+              <div className="w-full max-w-[390px] rounded-2xl overflow-hidden shadow-elevated border border-border/40 bg-card">
+                {product.image_url ? (
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    className="w-full h-auto max-h-[520px] block object-cover transition-transform duration-500 hover:scale-[1.02]"
+                  />
+                ) : (
+                  <div className="aspect-square w-full flex items-center justify-center bg-secondary">
+                    <span className="text-8xl font-serif text-muted-foreground/30">
+                      {product.name.charAt(0)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
 
-          {/* Info */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="lg:col-span-7 flex flex-col"
-          >
+            {/* Info */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col justify-center max-w-lg w-full"
+            >
             {/* Category */}
             {product.category && (
               <Link
@@ -333,6 +334,7 @@ export default function ProductDetail() {
             </div>
           </motion.div>
         </div>
+      </div>
 
         {/* Related Products */}
         {related.length > 0 && (
