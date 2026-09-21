@@ -122,14 +122,14 @@ export default function Cart() {
                 {/* Image */}
                 <Link
                   to={`/product/${item.product.slug}`}
-                  className="w-24 h-24 rounded-lg overflow-hidden bg-secondary shrink-0"
+                  className="w-24 h-24 rounded-lg overflow-hidden bg-secondary/40 border border-border/40 shrink-0 p-1.5 flex items-center justify-center"
                 >
                   <div className="w-full h-full">
                     {item.product.image_url ? (
                       <img
                         src={item.product.image_url}
                         alt={item.product.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

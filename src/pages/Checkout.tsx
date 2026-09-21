@@ -703,12 +703,12 @@ export default function Checkout() {
                     key={`${item.product.id}_${item.selectedWeight || 'default'}`}
                     className="flex gap-3"
                   >
-                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-secondary border border-border shrink-0">
+                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-secondary/40 border border-border shrink-0 p-1 flex items-center justify-center">
                       {item.product.image_url ? (
                         <img
                           src={item.product.image_url}
                           alt={item.product.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
