@@ -21,6 +21,7 @@ dist-ssr
 # Temporary cpanel uploads
 publc_html/
 public_html/
+publc_html_oldmilesweb/
 
 # Editor directories and files
 .vscode/*
