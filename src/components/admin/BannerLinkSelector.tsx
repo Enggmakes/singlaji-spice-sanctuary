@@ -18,6 +18,8 @@ interface BannerLinkSelectorProps {
   categories?: Array<{ id: string; name: string; slug?: string }>;
   products?: Array<{ id: string; name: string; slug?: string; price?: number }>;
   defaultSuggestedText?: string;
+  isCleanPoster?: boolean;
+  onCleanPosterToggle?: (isClean: boolean) => void;
   onSelectCleanGraphic?: () => void;
 }
 
@@ -29,6 +31,8 @@ export default function BannerLinkSelector({
   categories = [],
   products = [],
   defaultSuggestedText,
+  isCleanPoster,
+  onCleanPosterToggle,
   onSelectCleanGraphic,
 }: BannerLinkSelectorProps) {
   // Build dynamic standard pages
@@ -75,6 +79,10 @@ export default function BannerLinkSelector({
 
   // Keep state in sync with external value changes
   useEffect(() => {
+    if (isCleanPoster) {
+      setSelectedDropdownValue('__clean_ad_poster__');
+      return;
+    }
     const match = allPresetOptions.find((opt) => opt.value === value);
     if (match) {
       setSelectedDropdownValue(match.value);
@@ -82,24 +90,31 @@ export default function BannerLinkSelector({
       setSelectedDropdownValue('__custom__');
       setCustomInputValue(value);
     }
-  }, [value, categories, products]);
+  }, [value, categories, products, isCleanPoster]);
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setSelectedDropdownValue(selected);
 
     if (selected === '__clean_ad_poster__') {
-      if (onSelectCleanGraphic) {
+      if (onCleanPosterToggle) {
+        onCleanPosterToggle(true);
+      } else if (onSelectCleanGraphic) {
         onSelectCleanGraphic();
       }
       onChange('/products', '');
-    } else if (selected === '__custom__') {
-      const customVal = customInputValue || '/';
-      onChange(customVal, defaultSuggestedText || 'Explore');
     } else {
-      const match = allPresetOptions.find((opt) => opt.value === selected);
-      if (match) {
-        onChange(match.value, match.suggestedButtonText);
+      if (onCleanPosterToggle) {
+        onCleanPosterToggle(false);
+      }
+      if (selected === '__custom__') {
+        const customVal = customInputValue || '/';
+        onChange(customVal, defaultSuggestedText || 'Explore');
+      } else {
+        const match = allPresetOptions.find((opt) => opt.value === selected);
+        if (match) {
+          onChange(match.value, match.suggestedButtonText);
+        }
       }
     }
   };
@@ -129,12 +144,10 @@ export default function BannerLinkSelector({
           onChange={handleSelectChange}
           className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium text-foreground cursor-pointer"
         >
-          {onSelectCleanGraphic && (
-            <optgroup label="🎉 Festival / Promotion Preset">
-              <option value="__clean_ad_poster__">
-                🎨 Clean Festival / Ad Poster (No Text, No Buttons, No Shadow)
-              </option>
-            </optgroup>
+          {(onCleanPosterToggle || onSelectCleanGraphic) && (
+            <option value="__clean_ad_poster__">
+              🎨 No Text, No Button, No Shadow (Festival / Ad Poster)
+            </option>
           )}
 
           <optgroup label="📌 Standard Store Pages">

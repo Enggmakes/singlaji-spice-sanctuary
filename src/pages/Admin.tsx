@@ -2699,19 +2699,6 @@ export default function Admin() {
                   </span>
                 </div>
               </div>
-
-              {/* Strict 16:9 Ratio Requirement Guide Box */}
-              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="font-bold">
-                    Mandatory 16:9 Aspect Ratio Rule:
-                  </p>
-                  <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-                    To maintain pixel-perfect responsive layouts on mobiles, tablets, and desktops, every banner image <strong>MUST strictly follow the 16:9 widescreen ratio</strong> (e.g., <strong>1920×1080</strong>, <strong>1600×900</strong>, or <strong>1280×720</strong>). Any image that does not match 16:9 will be rejected automatically upon file selection.
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Add New Banner Form Card */}
@@ -2832,11 +2819,6 @@ export default function Admin() {
                                 </div>
                               </div>
                             )}
-                            {bannerForm.hide_overlay && (
-                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded bg-emerald-600/90 text-[10px] text-white font-semibold shadow-md flex items-center gap-1 backdrop-blur-sm">
-                                🎨 Clean Poster Mode (0% Shadow • Crisp Graphic)
-                              </div>
-                            )}
                             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
                               16:9 • {bannerValidationState.width}×{bannerValidationState.height}
                             </div>
@@ -2855,136 +2837,94 @@ export default function Admin() {
                   </div>
                 </div>
 
-                {/* Banner Style & Content Mode */}
-                <div className="pt-4 border-t border-border space-y-4">
-                  <div className="p-4 rounded-xl border border-primary/25 bg-primary/5 space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <Label htmlFor="banner-mode-select" className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-primary" />
-                          Banner Display Mode / Preset
-                        </Label>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Choose whether this banner shows title overlays & action buttons, or acts as a crisp full-slide graphic without text or shadow.
-                        </p>
-                      </div>
-                      <select
-                        id="banner-mode-select"
-                        value={bannerForm.hide_overlay ? 'clean' : 'standard'}
-                        onChange={(e) => {
-                          const isClean = e.target.value === 'clean';
-                          setBannerForm((prev) => ({
-                            ...prev,
-                            hide_overlay: isClean,
-                            show_buttons: !isClean,
-                          }));
-                        }}
-                        className="h-9 px-3 text-xs rounded-lg border border-border bg-background font-semibold cursor-pointer shadow-sm text-foreground focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="standard">Standard Banner (With Title, Subtitle & Buttons)</option>
-                        <option value="clean">🎨 Clean Festival / Ad Poster (No Text, No Buttons, No Shadow)</option>
-                      </select>
-                    </div>
-                    {bannerForm.hide_overlay && (
-                      <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                        ✓ Clean Festival / Ad Poster mode active: 0% shadow, no dark gradient, and no overlaid buttons. Clicking the banner will navigate directly to the Destination link selected below!
-                      </div>
-                    )}
+                {/* Optional Content Overlays & Click URL Configuration */}
+                <div className="pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="banner-badge" className="text-xs">
+                      Badge / Tag (Optional)
+                    </Label>
+                    <Input
+                      id="banner-badge"
+                      placeholder="e.g. Premium Indian Spices"
+                      value={bannerForm.badge_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, badge_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
                   </div>
 
-                  {/* Content Inputs Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="banner-badge" className="text-xs">
-                        Badge / Tag (Optional)
-                      </Label>
-                      <Input
-                        id="banner-badge"
-                        placeholder="e.g. Premium Indian Spices"
-                        value={bannerForm.badge_text}
-                        onChange={(e) => setBannerForm({ ...bannerForm, badge_text: e.target.value })}
-                        className="text-xs mt-1"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="banner-title" className="text-xs">
+                      Banner Heading / Title (Optional)
+                    </Label>
+                    <Textarea
+                      id="banner-title"
+                      rows={2}
+                      placeholder="e.g. Authentic Flavors, Straight from India"
+                      value={bannerForm.title}
+                      onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                      className="text-xs mt-1 resize-none"
+                    />
+                  </div>
 
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="banner-title" className="text-xs">
-                          Banner Heading / Title (Optional)
-                        </Label>
-                        <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
-                      </div>
-                      <Textarea
-                        id="banner-title"
-                        rows={2}
-                        placeholder="e.g. Authentic Flavors,&#10;Straight from India"
-                        value={bannerForm.title}
-                        onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
-                        className="text-xs mt-1 resize-none"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="banner-subtitle" className="text-xs">
+                      Subtitle / Caption (Optional)
+                    </Label>
+                    <Textarea
+                      id="banner-subtitle"
+                      rows={2}
+                      placeholder="e.g. Experience the rich heritage of Indian cuisine"
+                      value={bannerForm.subtitle}
+                      onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
+                      className="text-xs mt-1 resize-none"
+                    />
+                  </div>
 
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="banner-subtitle" className="text-xs">
-                          Subtitle / Caption (Optional)
-                        </Label>
-                        <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
-                      </div>
-                      <Textarea
-                        id="banner-subtitle"
-                        rows={2}
-                        placeholder="e.g. Experience the rich heritage of Indian cuisine&#10;Handcrafted in Abohar"
-                        value={bannerForm.subtitle}
-                        onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
-                        className="text-xs mt-1 resize-none"
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
+                      Primary Button Text
+                    </Label>
+                    <Input
+                      id="banner-btn-text"
+                      placeholder="Shop Now"
+                      value={bannerForm.button_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
 
-                    <div>
-                      <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
-                        Primary Button Text {bannerForm.hide_overlay && '(Omitted in Poster mode)'}
-                      </Label>
-                      <Input
-                        id="banner-btn-text"
-                        placeholder="Shop Now"
-                        value={bannerForm.button_text}
-                        onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
-                        className="text-xs mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <BannerLinkSelector
-                        id="banner-btn-link"
-                        label={bannerForm.hide_overlay ? "Banner Destination (Clicking Poster Opens)" : "Primary Button Destination"}
-                        value={bannerForm.button_link}
-                        onSelectCleanGraphic={() => {
-                          setBannerForm((prev) => ({
-                            ...prev,
-                            hide_overlay: true,
-                            show_buttons: false,
-                          }));
-                        }}
-                        onChange={(url, suggestedText) => {
-                          setBannerForm((prev) => ({
-                            ...prev,
-                            button_link: url,
-                            button_text:
-                              suggestedText &&
-                              (!prev.button_text ||
-                                prev.button_text === 'Shop Now' ||
-                                prev.button_text.startsWith('Shop') ||
-                                prev.button_text.startsWith('Buy'))
-                                ? suggestedText
-                                : prev.button_text,
-                          }));
-                        }}
-                        categories={categories}
-                        products={products}
-                        defaultSuggestedText="Shop Now"
-                      />
-                    </div>
+                  <div>
+                    <BannerLinkSelector
+                      id="banner-btn-link"
+                      label="Primary Button Destination"
+                      value={bannerForm.button_link}
+                      isCleanPoster={bannerForm.hide_overlay}
+                      onCleanPosterToggle={(isClean) => {
+                        setBannerForm((prev) => ({
+                          ...prev,
+                          hide_overlay: isClean,
+                          show_buttons: !isClean,
+                        }));
+                      }}
+                      onChange={(url, suggestedText) => {
+                        setBannerForm((prev) => ({
+                          ...prev,
+                          button_link: url,
+                          button_text:
+                            suggestedText &&
+                            (!prev.button_text ||
+                              prev.button_text === 'Shop Now' ||
+                              prev.button_text.startsWith('Shop') ||
+                              prev.button_text.startsWith('Buy'))
+                              ? suggestedText
+                              : prev.button_text,
+                        }));
+                      }}
+                      categories={categories}
+                      products={products}
+                      defaultSuggestedText="Shop Now"
+                    />
+                  </div>
 
                   <div>
                     <Label htmlFor="banner-sec-btn-text" className="text-xs">
@@ -3035,7 +2975,6 @@ export default function Admin() {
                       className="text-xs mt-1"
                     />
                   </div>
-                </div>
                 </div>
 
                 {/* Submit Actions */}
@@ -3835,53 +3774,14 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  {/* Banner Mode / Style Selector */}
-                  <div className="p-3.5 rounded-xl border border-primary/25 bg-primary/5 space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <Label htmlFor="edit-banner-mode-select" className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-primary" />
-                          Banner Display Mode / Preset
-                        </Label>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Choose standard text overlay or crisp poster mode (no text, no buttons, 0% shadow).
-                        </p>
-                      </div>
-                      <select
-                        id="edit-banner-mode-select"
-                        value={editBannerForm.hide_overlay ? 'clean' : 'standard'}
-                        onChange={(e) => {
-                          const isClean = e.target.value === 'clean';
-                          setEditBannerForm((prev) => ({
-                            ...prev,
-                            hide_overlay: isClean,
-                            show_buttons: !isClean,
-                          }));
-                        }}
-                        className="h-9 px-3 text-xs rounded-lg border border-border bg-background font-semibold cursor-pointer shadow-sm text-foreground focus:ring-1 focus:ring-primary"
-                      >
-                        <option value="standard">Standard Banner (With Title, Subtitle & Buttons)</option>
-                        <option value="clean">🎨 Clean Festival / Ad Poster (No Text, No Buttons, No Shadow)</option>
-                      </select>
-                    </div>
-                    {editBannerForm.hide_overlay && (
-                      <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                        ✓ Clean Festival / Ad Poster mode active: 0% shadow, no dark gradient, and no overlaid buttons. Clicking the banner will navigate directly to the Primary Destination link!
-                      </div>
-                    )}
-                  </div>
-
                   <div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="edit-banner-title" className="text-xs">
-                        Banner Heading / Title (Optional)
-                      </Label>
-                      <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
-                    </div>
+                    <Label htmlFor="edit-banner-title" className="text-xs">
+                      Banner Heading / Title (Optional)
+                    </Label>
                     <Textarea
                       id="edit-banner-title"
                       rows={2}
-                      placeholder="e.g. Authentic Flavors,&#10;Straight from India"
+                      placeholder="e.g. Authentic Flavors, Straight from India"
                       value={editBannerForm.title}
                       onChange={(e) =>
                         setEditBannerForm({ ...editBannerForm, title: e.target.value })
@@ -3891,12 +3791,9 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="edit-banner-subtitle" className="text-xs">
-                        Subtitle / Caption (Optional)
-                      </Label>
-                      <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
-                    </div>
+                    <Label htmlFor="edit-banner-subtitle" className="text-xs">
+                      Subtitle / Caption (Optional)
+                    </Label>
                     <Textarea
                       id="edit-banner-subtitle"
                       rows={2}
@@ -3940,13 +3837,14 @@ export default function Admin() {
                         <div>
                           <BannerLinkSelector
                             id="edit-banner-primary-link"
-                            label={editBannerForm.hide_overlay ? "Banner Destination (Clicking Poster Opens)" : "Primary Button Destination"}
+                            label="Primary Button Destination"
                             value={editBannerForm.button_link}
-                            onSelectCleanGraphic={() => {
+                            isCleanPoster={editBannerForm.hide_overlay}
+                            onCleanPosterToggle={(isClean) => {
                               setEditBannerForm((prev) => ({
                                 ...prev,
-                                hide_overlay: true,
-                                show_buttons: false,
+                                hide_overlay: isClean,
+                                show_buttons: !isClean,
                               }));
                             }}
                             onChange={(url, suggestedText) =>
