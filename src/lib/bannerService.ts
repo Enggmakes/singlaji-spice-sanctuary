@@ -318,14 +318,25 @@ export async function createHeroBanner(
 
   // Try inserting into Supabase
   try {
-    const { error } = await supabase.from('hero_banners').insert(newBanner);
+    let { error } = await supabase.from('hero_banners').insert(newBanner);
+
+    // If Supabase does not have hide_overlay column yet, retry insert without it
+    if (error && (error.message?.includes('hide_overlay') || error.code === 'PGRST204')) {
+      console.warn('hide_overlay column not found in Supabase schema cache. Retrying insert without it...');
+      const { hide_overlay, ...bannerWithoutOverlayCol } = newBanner;
+      const res = await supabase.from('hero_banners').insert(bannerWithoutOverlayCol);
+      error = res.error;
+    }
+
     if (error) {
-      console.warn('Supabase hero_banners insert notice:', error.message);
+      console.error('Supabase hero_banners insert error:', error);
+      throw new Error(`Database error: ${error.message}`);
     } else {
       console.log('Hero banner successfully synchronized with Supabase database!');
     }
-  } catch (err) {
-    console.log('Supabase hero_banners insert fallback to local storage:', err);
+  } catch (err: any) {
+    console.error('Failed to insert banner into Supabase:', err);
+    throw err;
   }
 
   // Update local storage
@@ -345,17 +356,31 @@ export async function updateHeroBanner(
   updates: Partial<HeroBanner>
 ): Promise<void> {
   try {
-    const { error } = await supabase
+    let { error } = await supabase
       .from('hero_banners')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id);
+
+    // If Supabase does not have hide_overlay column yet, retry update without it
+    if (error && (error.message?.includes('hide_overlay') || error.code === 'PGRST204')) {
+      console.warn('hide_overlay column not found in Supabase schema cache. Retrying update without it...');
+      const { hide_overlay, ...updatesWithoutOverlayCol } = updates;
+      const res = await supabase
+        .from('hero_banners')
+        .update({ ...updatesWithoutOverlayCol, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      error = res.error;
+    }
+
     if (error) {
-      console.warn('Supabase hero_banners update notice:', error.message);
+      console.error('Supabase hero_banners update error:', error);
+      throw new Error(`Database error: ${error.message}`);
     } else {
       console.log('Hero banner update synchronized with Supabase!');
     }
-  } catch (err) {
-    console.log('Supabase hero_banners update fallback to local storage:', err);
+  } catch (err: any) {
+    console.error('Failed to update banner in Supabase:', err);
+    throw err;
   }
 
   const current = getLocalBanners();
