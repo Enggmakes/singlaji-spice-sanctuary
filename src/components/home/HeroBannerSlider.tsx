@@ -144,7 +144,7 @@ export default function HeroBannerSlider() {
 
   return (
     <section
-      className="relative w-full max-w-[1920px] mx-auto aspect-[16/9] overflow-hidden select-none bg-stone-900 group"
+      className="relative w-full max-w-[1920px] mx-auto aspect-[2.4/1] overflow-hidden select-none bg-stone-900 group"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -166,7 +166,7 @@ export default function HeroBannerSlider() {
           }}
           className="absolute inset-0 w-full h-full"
         >
-          {/* Background Image Container strictly in 16:9 */}
+          {/* Background Image Container strictly in 2.4:1 (21:9) */}
           <div className="relative w-full h-full">
             <img
               src={currentBanner.image_url}
@@ -329,8 +329,8 @@ export default function HeroBannerSlider() {
         </div>
       )}
 
-      {/* 16:9 Indicator watermark badge for admins or quick debug (subtle) */}
-      <div className="sr-only">16:9 Aspect Ratio Hero Banner Carousel</div>
+      {/* 2.4:1 Indicator watermark badge for accessibility / screen readers */}
+      <div className="sr-only">2.4:1 Aspect Ratio Hero Banner Carousel</div>
     </section>
   );
 }

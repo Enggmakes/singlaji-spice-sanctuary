@@ -556,7 +556,7 @@ export default function Admin() {
   const [loadingBanners, setLoadingBanners] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Hero Banner Form State (Strict 16:9 Ratio Required)
+  // Hero Banner Form State (Standard 2.4:1 / 21:9 Ratio Required)
   const [bannerForm, setBannerForm] = useState<{
     title: string;
     subtitle: string;
@@ -1423,7 +1423,7 @@ export default function Admin() {
   };
 
   // =========================================================================
-  // HERO BANNERS MANAGEMENT HANDLERS (STRICT 16:9 RATIO ENFORCEMENT)
+  // HERO BANNERS MANAGEMENT HANDLERS (STANDARD 2.4:1 / 21:9 RATIO)
   // =========================================================================
   const loadBanners = async () => {
     setLoadingBanners(true);
@@ -1441,7 +1441,7 @@ export default function Admin() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Strict 16:9 ratio validation
+    // Standard 2.4:1 / 21:9 ratio validation
     const result = await validate16by9Ratio(file);
 
     if (!result.isValid) {
@@ -1457,16 +1457,16 @@ export default function Admin() {
         error: result.error,
       });
 
-      toast.error('Image Rejected: Mandatory 16:9 Ratio Required!', {
+      toast.error('Image Rejected: Standard 2.4:1 / 21:9 Ratio Required!', {
         description:
           result.error ||
-          'Only 16:9 aspect ratio images are allowed (e.g. 1920×1080, 1600×900, 1280×720). Other sizes are strictly prohibited.',
+          'Only 2.4:1 or 21:9 aspect ratio images are allowed (Recommended: 1920×800, 1440×600, or 1200×500).',
         duration: 7000,
       });
       return;
     }
 
-    // Success: Verified 16:9 ratio
+    // Success: Verified 2.4:1 (21:9) ratio
     setBannerValidationState({
       isValid: true,
       width: result.width,
@@ -1476,7 +1476,7 @@ export default function Admin() {
     setBannerImageFile(file);
     setBannerImagePreview(URL.createObjectURL(file));
 
-    toast.success('16:9 Aspect Ratio Verified!', {
+    toast.success('2.4:1 (21:9) Aspect Ratio Verified!', {
       description: `Widescreen Resolution: ${result.width} × ${result.height} (${(result.ratio).toFixed(2)}:1)`,
     });
   };
@@ -1485,19 +1485,19 @@ export default function Admin() {
     e.preventDefault();
 
     if (!bannerImageFile) {
-      toast.error('Please upload a 16:9 banner image');
+      toast.error('Please upload a 2.4:1 (1920×800) banner image');
       return;
     }
 
     if (!bannerValidationState.isValid) {
-      toast.error('Cannot save: 16:9 aspect ratio is mandatory!');
+      toast.error('Cannot save: Standard 2.4:1 / 21:9 aspect ratio is mandatory!');
       return;
     }
 
     setAddingBanner(true);
     try {
-      // 1. High-quality client-side compression (1920x1080 web resolution)
-      const comp = await compressImage(bannerImageFile, { maxWidth: 1920, maxHeight: 1080, quality: 0.85 });
+      // 1. High-quality client-side compression (1920x800 web resolution)
+      const comp = await compressImage(bannerImageFile, { maxWidth: 1920, maxHeight: 800, quality: 0.85 });
       const fileToUpload = comp.file;
       const cleanFileName = `banner-${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
       let finalImageUrl = '';
@@ -1542,12 +1542,12 @@ export default function Admin() {
         hide_overlay: bannerForm.hide_overlay,
         sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
         is_active: bannerForm.is_active,
-        aspect_ratio: '16:9',
+        aspect_ratio: '2.4:1',
         width: bannerValidationState.width,
         height: bannerValidationState.height,
       });
 
-      toast.success('16:9 Hero Banner Added Successfully!');
+      toast.success('2.4:1 Hero Banner Added Successfully!');
 
       // Reset form with default buttons
       setBannerForm({
@@ -1659,7 +1659,7 @@ export default function Admin() {
     const result = await validate16by9Ratio(file);
     if (!result.isValid) {
       e.target.value = '';
-      toast.error('Image Rejected: Mandatory 16:9 Ratio Required!', {
+      toast.error('Image Rejected: Standard 2.4:1 / 21:9 Ratio Required!', {
         description: result.error,
         duration: 6000,
       });
@@ -1671,7 +1671,7 @@ export default function Admin() {
       new_image_file: file,
       new_image_preview: URL.createObjectURL(file),
     }));
-    toast.success('16:9 Aspect Ratio Verified!');
+    toast.success('2.4:1 (21:9) Aspect Ratio Verified!');
   };
 
   const handleSaveBannerEdit = async (e: React.FormEvent) => {
@@ -1683,7 +1683,7 @@ export default function Admin() {
       let finalImageUrl = editBannerForm.current_image_url;
 
       if (editBannerForm.new_image_file) {
-        const comp = await compressImage(editBannerForm.new_image_file, { maxWidth: 1920, maxHeight: 1080, quality: 0.85 });
+        const comp = await compressImage(editBannerForm.new_image_file, { maxWidth: 1920, maxHeight: 800, quality: 0.85 });
         const fileToUpload = comp.file;
         const cleanFileName = `banner-${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
         try {
@@ -2678,7 +2678,7 @@ export default function Admin() {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 5: HERO BANNERS (MANDATORY 16:9 RATIO ENFORCEMENT) */}
+        {/* TAB 5: HERO BANNERS (STANDARD 2.4:1 / 21:9 RATIO) */}
         {/* ============================================================== */}
         {activeTab === 'banners' && (
           <div className="space-y-8">
@@ -2706,19 +2706,19 @@ export default function Admin() {
               <div className="border-b border-border pb-4">
                 <h3 className="text-lg font-bold font-serif text-foreground flex items-center gap-2">
                   <Plus className="h-5 w-5 text-primary" />
-                  Upload New 16:9 Hero Banner
+                  Upload New 2.4:1 Hero Banner
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Select an image with exact 16:9 dimensions and configure optional text overlays or click redirects.
+                  Select an image with standard 2.4:1 or 21:9 dimensions (Recommended: 1920 × 800 px) and configure optional text overlays or click redirects.
                 </p>
               </div>
 
               <form onSubmit={handleCreateBanner} className="space-y-6">
-                {/* Image Upload Area with Strict 16:9 Checker */}
+                {/* Image Upload Area with Strict 2.4:1 / 21:9 Checker */}
                 <div className="space-y-3">
                   <Label htmlFor="hero-banner-image-input" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-primary" />
-                    Banner Graphic File <span className="text-destructive font-bold">* (Strict 16:9 Ratio Only)</span>
+                    Banner Graphic File <span className="text-destructive font-bold">* (Standard 2.4:1 / 21:9 Ratio - 1920×800)</span>
                   </Label>
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -2741,10 +2741,10 @@ export default function Admin() {
                           </div>
                           <div>
                             <span className="text-sm font-semibold text-primary hover:underline">
-                              Click to select 16:9 image
+                              Click to select 2.4:1 / 21:9 image
                             </span>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              JPEG, PNG, or WebP • Recommended: 1920 × 1080
+                              JPEG, PNG, or WebP • Recommended: 1920 × 800 (or 21:9)
                             </p>
                           </div>
                         </label>
@@ -2765,7 +2765,7 @@ export default function Admin() {
                         <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
                           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                           <div>
-                            <span className="font-bold">16:9 Aspect Ratio Verified!</span>
+                            <span className="font-bold">2.4:1 (21:9) Aspect Ratio Verified!</span>
                             <span className="ml-1.5 opacity-90">
                               Resolution: {bannerValidationState.width} × {bannerValidationState.height} ({(bannerValidationState.ratio || 0).toFixed(2)}:1)
                             </span>
@@ -2774,17 +2774,17 @@ export default function Admin() {
                       )}
                     </div>
 
-                    {/* Live 16:9 Preview Box */}
+                    {/* Live 2.4:1 Preview Box */}
                     <div className="lg:col-span-6 space-y-2">
                       <Label className="text-xs font-semibold text-muted-foreground">
-                        Live 16:9 Storefront Preview
+                        Live 2.4:1 Storefront Preview
                       </Label>
-                      <div className="w-full aspect-[16/9] rounded-xl border border-border bg-stone-900 relative overflow-hidden flex items-center justify-center shadow-inner group">
+                      <div className="w-full aspect-[2.4/1] rounded-xl border border-border bg-stone-900 relative overflow-hidden flex items-center justify-center shadow-inner group">
                         {bannerImagePreview ? (
                           <>
                             <img
                               src={bannerImagePreview}
-                              alt="16:9 Banner Preview"
+                              alt="2.4:1 Banner Preview"
                               className="w-full h-full object-cover"
                             />
                             {/* Overlay simulator with buttons (Hidden if Clean Festival / Ad Poster mode is selected) */}
@@ -2820,7 +2820,7 @@ export default function Admin() {
                               </div>
                             )}
                             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
-                              16:9 • {bannerValidationState.width}×{bannerValidationState.height}
+                              2.4:1 • {bannerValidationState.width}×{bannerValidationState.height}
                             </div>
                           </>
                         ) : (
@@ -2828,7 +2828,7 @@ export default function Admin() {
                             <ImageIcon className="w-8 h-8 mx-auto opacity-40" />
                             <p className="text-xs">No image selected</p>
                             <p className="text-[10px] opacity-70">
-                              16:9 preview will appear here once a valid 16:9 file is selected
+                              2.4:1 preview will appear here once a valid 2.4:1 / 21:9 file is selected
                             </p>
                           </div>
                         )}
@@ -3003,7 +3003,7 @@ export default function Admin() {
                         products={products}
                       />
                       <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        ✓ Buttons are hidden. Clicking anywhere on this 16:9 banner image will open this destination.
+                        ✓ Buttons are hidden. Clicking anywhere on this 2.4:1 banner image will open this destination.
                       </p>
                     </div>
                   )}
@@ -3033,12 +3033,12 @@ export default function Admin() {
                     {addingBanner ? (
                       <span className="flex items-center gap-2">
                         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        Saving 16:9 Banner...
+                        Saving 2.4:1 Banner...
                       </span>
                     ) : (
                       <span className="flex items-center gap-2">
                         <Plus className="h-4 w-4" />
-                        Add 16:9 Banner
+                        Add 2.4:1 Banner
                       </span>
                     )}
                   </Button>
@@ -3074,7 +3074,7 @@ export default function Admin() {
                   <ImageIcon className="w-8 h-8 mx-auto opacity-30" />
                   <p className="font-semibold">No custom banners added yet</p>
                   <p className="text-[11px] opacity-75">
-                    Storefront is currently using the default Singlaji hero banner. Add your first 16:9 banner above!
+                    Storefront is currently using the default Singlaji hero banner. Add your first 2.4:1 banner above!
                   </p>
                 </div>
               ) : (
@@ -3084,10 +3084,10 @@ export default function Admin() {
                       key={b.id}
                       className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4"
                     >
-                      {/* Left: 16:9 Thumbnail & Info */}
+                      {/* Left: 2.4:1 Thumbnail & Info */}
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
-                        {/* 16:9 Thumbnail Container */}
-                        <div className="relative aspect-[16/9] w-full sm:w-56 rounded-xl overflow-hidden border border-border bg-stone-900 shrink-0 shadow-sm">
+                        {/* 2.4:1 Thumbnail Container */}
+                        <div className="relative aspect-[2.4/1] w-full sm:w-56 rounded-xl overflow-hidden border border-border bg-stone-900 shrink-0 shadow-sm">
                           <img
                             src={b.image_url}
                             alt={b.title || 'Hero Banner'}
@@ -3097,7 +3097,7 @@ export default function Admin() {
                             #{idx + 1}
                           </div>
                           <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-emerald-500/80 text-[9px] text-white font-mono font-medium backdrop-blur-sm">
-                            16:9
+                            2.4:1
                           </div>
                         </div>
 
@@ -3681,7 +3681,7 @@ export default function Admin() {
         )}
 
         {/* ============================================================== */}
-        {/* EDIT HERO BANNER MODAL (STRICT 16:9 VALIDATION) */}
+        {/* EDIT HERO BANNER MODAL (STANDARD 2.4:1 / 21:9 VALIDATION) */}
         {/* ============================================================== */}
         {editingBanner &&
           createPortal(
@@ -3706,7 +3706,7 @@ export default function Admin() {
                         Edit Hero Banner
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        Modify banner content, CTA buttons, sequence, or replace 16:9 image
+                        Modify banner content, CTA buttons, sequence, or replace 2.4:1 image
                       </p>
                     </div>
                   </div>
@@ -3724,13 +3724,13 @@ export default function Admin() {
 
                 {/* Modal Body */}
                 <form onSubmit={handleSaveBannerEdit} className="p-6 overflow-y-auto space-y-5">
-                  {/* 16:9 Image Preview & Replacement */}
+                  {/* 2.4:1 Image Preview & Replacement */}
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                      <span>16:9 Banner Image</span>
-                      <span className="text-[10px] text-primary font-mono">Strict 16:9 Required</span>
+                      <span>2.4:1 Banner Image</span>
+                      <span className="text-[10px] text-primary font-mono">Standard 2.4:1 / 21:9 Required</span>
                     </Label>
-                    <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden border border-border bg-stone-900 shadow-inner group">
+                    <div className="relative aspect-[2.4/1] w-full rounded-xl overflow-hidden border border-border bg-stone-900 shadow-inner group">
                       <img
                         src={editBannerForm.new_image_preview || editBannerForm.current_image_url}
                         alt="Banner Preview"
@@ -3742,7 +3742,7 @@ export default function Admin() {
                           className="cursor-pointer px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 text-white text-xs font-medium backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all shadow-md"
                         >
                           <Upload className="w-3.5 h-3.5" />
-                          {editBannerForm.new_image_file ? 'Change Selected Image' : 'Replace Image (16:9 Only)'}
+                          {editBannerForm.new_image_file ? 'Change Selected Image' : 'Replace Image (2.4:1 / 21:9)'}
                         </label>
                         <input
                           id="edit-hero-banner-image"
@@ -3756,7 +3756,7 @@ export default function Admin() {
                     {editBannerForm.new_image_file && (
                       <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        New 16:9 Image selected: {editBannerForm.new_image_file.name}
+                        New 2.4:1 Image selected: {editBannerForm.new_image_file.name}
                       </div>
                     )}
                   </div>
@@ -3933,7 +3933,7 @@ export default function Admin() {
                           products={products}
                         />
                         <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                          ✓ Buttons are hidden. Clicking anywhere on this 16:9 banner image will open this destination.
+                          ✓ Buttons are hidden. Clicking anywhere on this 2.4:1 banner image will open this destination.
                         </p>
                       </div>
                     )}

@@ -12,7 +12,7 @@ export interface HeroBanner {
   hide_overlay?: boolean;
   sort_order: number;
   is_active: boolean;
-  aspect_ratio?: string; // e.g. "16:9"
+  aspect_ratio?: string; // e.g. "2.4:1" or "21:9"
   width?: number;
   height?: number;
   created_at?: string;

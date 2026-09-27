@@ -21,18 +21,18 @@ export const DEFAULT_BANNERS: HeroBanner[] = [
     secondary_button_link: '/about',
     sort_order: 1,
     is_active: true,
-    aspect_ratio: '16:9',
+    aspect_ratio: '2.4:1',
     width: 1920,
-    height: 1080,
+    height: 800,
     created_at: new Date().toISOString(),
   },
 ];
 
 /**
- * Strict 16:9 Aspect Ratio Validator.
- * Returns dimensions, computed ratio, and whether it strictly matches 16:9 (±0.04 tolerance for standard pixel rounding).
+ * Strict 2.4:1 / 21:9 Aspect Ratio Validator (Standard E-Commerce Hero Banner).
+ * Accepts 2.4:1 (1920×800) and 21:9 (2560×1080) with a safe tolerance (2.20:1 to 2.55:1).
  */
-export async function validate16by9Ratio(file: File): Promise<{
+export async function validateBannerRatio(file: File): Promise<{
   isValid: boolean;
   width: number;
   height: number;
@@ -70,12 +70,12 @@ export async function validate16by9Ratio(file: File): Promise<{
       }
 
       const ratio = width / height;
-      const targetRatio = 16 / 9; // ~1.77778
-      const diff = Math.abs(ratio - targetRatio);
 
-      // Tolerance of 0.04 allows standard resolutions like 1366x768 (1.7786), 1920x1080 (1.7778), 1280x720 (1.7778)
-      // while strictly rejecting square (1.0), vertical (0.56), 4:3 (1.33), 3:2 (1.5), 21:9 (2.33), etc.
-      if (diff <= 0.04) {
+      // Accepts standard e-commerce hero banner ratios:
+      // 21:9 (~2.33:1) up to 2.4:1 (1920×800) and 2.5:1
+      const isValid = ratio >= 2.20 && ratio <= 2.55;
+
+      if (isValid) {
         return resolve({
           isValid: true,
           width,
@@ -90,7 +90,7 @@ export async function validate16by9Ratio(file: File): Promise<{
         width,
         height,
         ratio,
-        error: `Invalid aspect ratio! Your image is ${width}×${height} (${roundedRatio}:1). A mandatory 16:9 ratio (1.78:1) is required (e.g., 1920×1080, 1600×900, 1280×720).`,
+        error: `Invalid aspect ratio! Your image is ${width}×${height} (${roundedRatio}:1). Standard 2.4:1 (or 21:9) hero banner ratio is required (Recommended: 1920×800, 1440×600, or 1200×500).`,
       });
     };
 
@@ -108,6 +108,9 @@ export async function validate16by9Ratio(file: File): Promise<{
     img.src = objectUrl;
   });
 }
+
+// Backward-compatible alias for existing imports
+export const validate16by9Ratio = validateBannerRatio;
 
 /**
  * Get locally cached banners
@@ -217,9 +220,9 @@ export async function syncLocalBannersToSupabase(): Promise<HeroBanner[]> {
       show_buttons: b.show_buttons !== false,
       sort_order: b.sort_order || 1,
       is_active: b.is_active,
-      aspect_ratio: b.aspect_ratio || '16:9',
+      aspect_ratio: b.aspect_ratio || '2.4:1',
       width: b.width || 1920,
-      height: b.height || 1080,
+      height: b.height || 800,
     };
 
     try {

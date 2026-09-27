@@ -21,7 +21,7 @@ export default function Index() {
 
   return (
     <Layout>
-      {/* Dynamic 16:9 Multi-Banner Auto-Changing Hero Carousel */}
+      {/* Dynamic 2.4:1 Multi-Banner Auto-Changing Hero Carousel */}
       <HeroBannerSlider />
 
       {/* Trust Badges */}
