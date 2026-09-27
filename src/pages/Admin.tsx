@@ -1534,11 +1534,11 @@ export default function Admin() {
         title: bannerForm.hide_overlay ? undefined : bannerForm.title.trim() || undefined,
         subtitle: bannerForm.hide_overlay ? undefined : bannerForm.subtitle.trim() || undefined,
         badge_text: bannerForm.hide_overlay ? undefined : bannerForm.badge_text.trim() || undefined,
-        button_text: bannerForm.hide_overlay ? '' : (bannerForm.button_text.trim() || 'Shop Now'),
-        button_link: bannerForm.hide_overlay ? (bannerForm.button_link === '/products' ? '' : bannerForm.button_link.trim()) : bannerForm.button_link.trim(),
-        secondary_button_text: bannerForm.hide_overlay ? '' : (bannerForm.secondary_button_text.trim() || 'Our Story'),
-        secondary_button_link: bannerForm.hide_overlay ? '' : bannerForm.secondary_button_link.trim(),
-        show_buttons: !bannerForm.hide_overlay && bannerForm.show_buttons !== false,
+        button_text: bannerForm.show_buttons ? (bannerForm.button_text.trim() || 'Shop Now') : '',
+        button_link: bannerForm.button_link?.trim() || '/products',
+        secondary_button_text: bannerForm.show_buttons ? (bannerForm.secondary_button_text.trim() || 'Our Story') : '',
+        secondary_button_link: bannerForm.show_buttons ? bannerForm.secondary_button_link.trim() : '',
+        show_buttons: bannerForm.show_buttons !== false,
         hide_overlay: bannerForm.hide_overlay,
         sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
         is_active: bannerForm.is_active,
@@ -1715,11 +1715,11 @@ export default function Admin() {
         title: editBannerForm.hide_overlay ? undefined : editBannerForm.title.trim() || undefined,
         subtitle: editBannerForm.hide_overlay ? undefined : editBannerForm.subtitle.trim() || undefined,
         badge_text: editBannerForm.hide_overlay ? undefined : editBannerForm.badge_text.trim() || undefined,
-        button_text: editBannerForm.hide_overlay ? '' : (editBannerForm.button_text.trim() || 'Shop Now'),
-        button_link: editBannerForm.hide_overlay ? (editBannerForm.button_link === '/products' ? '' : editBannerForm.button_link.trim()) : editBannerForm.button_link.trim(),
-        secondary_button_text: editBannerForm.hide_overlay ? '' : (editBannerForm.secondary_button_text.trim() || 'Our Story'),
-        secondary_button_link: editBannerForm.hide_overlay ? '' : editBannerForm.secondary_button_link.trim(),
-        show_buttons: !editBannerForm.hide_overlay && editBannerForm.show_buttons !== false,
+        button_text: editBannerForm.show_buttons ? (editBannerForm.button_text.trim() || 'Shop Now') : '',
+        button_link: editBannerForm.button_link?.trim() || '/products',
+        secondary_button_text: editBannerForm.show_buttons ? (editBannerForm.secondary_button_text.trim() || 'Our Story') : '',
+        secondary_button_link: editBannerForm.show_buttons ? editBannerForm.secondary_button_link.trim() : '',
+        show_buttons: editBannerForm.show_buttons !== false,
         hide_overlay: editBannerForm.hide_overlay,
         sort_order: Number(editBannerForm.sort_order) || 1,
         is_active: editBannerForm.is_active,
@@ -2881,92 +2881,6 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
-                      Primary Button Text
-                    </Label>
-                    <Input
-                      id="banner-btn-text"
-                      placeholder="Shop Now"
-                      value={bannerForm.button_text}
-                      onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
-                      className="text-xs mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <BannerLinkSelector
-                      id="banner-btn-link"
-                      label="Primary Button Destination"
-                      value={bannerForm.button_link}
-                      isCleanPoster={bannerForm.hide_overlay}
-                      onCleanPosterToggle={(isClean) => {
-                        setBannerForm((prev) => ({
-                          ...prev,
-                          hide_overlay: isClean,
-                          show_buttons: !isClean,
-                          title: isClean ? '' : prev.title,
-                          subtitle: isClean ? '' : prev.subtitle,
-                          badge_text: isClean ? '' : prev.badge_text,
-                          button_text: isClean ? '' : (prev.button_text || 'Shop Now'),
-                          button_link: isClean ? '' : prev.button_link,
-                        }));
-                      }}
-                      onChange={(url, suggestedText) => {
-                        setBannerForm((prev) => ({
-                          ...prev,
-                          button_link: url,
-                          button_text:
-                            suggestedText &&
-                            (!prev.button_text ||
-                              prev.button_text === 'Shop Now' ||
-                              prev.button_text.startsWith('Shop') ||
-                              prev.button_text.startsWith('Buy'))
-                              ? suggestedText
-                              : prev.button_text,
-                        }));
-                      }}
-                      categories={categories}
-                      products={products}
-                      defaultSuggestedText="Shop Now"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="banner-sec-btn-text" className="text-xs">
-                      Secondary Button Text
-                    </Label>
-                    <Input
-                      id="banner-sec-btn-text"
-                      placeholder="Our Story"
-                      value={bannerForm.secondary_button_text}
-                      onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_text: e.target.value })}
-                      className="text-xs mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <BannerLinkSelector
-                      id="banner-sec-btn-link"
-                      label="Secondary Button Destination"
-                      value={bannerForm.secondary_button_link}
-                      onChange={(url, suggestedText) => {
-                        setBannerForm((prev) => ({
-                          ...prev,
-                          secondary_button_link: url,
-                          secondary_button_text:
-                            suggestedText &&
-                            (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
-                              ? suggestedText
-                              : prev.secondary_button_text,
-                        }));
-                      }}
-                      categories={categories}
-                      products={products}
-                      defaultSuggestedText="Our Story"
-                    />
-                  </div>
-
-                  <div>
                     <Label htmlFor="banner-order" className="text-xs">
                       Display Sequence Number
                     </Label>
@@ -2982,9 +2896,9 @@ export default function Admin() {
                   </div>
                 </div>
 
-                {/* Submit Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
-                  <div className="flex flex-wrap items-center gap-6">
+                {/* Button & Destination Link Controls */}
+                <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-4">
+                  <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -2996,7 +2910,108 @@ export default function Admin() {
                         Show "Shop Now" & "Our Story" Buttons on Slide
                       </span>
                     </label>
+                  </div>
 
+                  {bannerForm.show_buttons ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
+                          Primary Button Text
+                        </Label>
+                        <Input
+                          id="banner-btn-text"
+                          placeholder="Shop Now"
+                          value={bannerForm.button_text}
+                          onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
+                          className="text-xs mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <BannerLinkSelector
+                          id="banner-btn-link"
+                          label="Primary Button Destination"
+                          value={bannerForm.button_link}
+                          onChange={(url, suggestedText) => {
+                            setBannerForm((prev) => ({
+                              ...prev,
+                              button_link: url,
+                              button_text:
+                                suggestedText &&
+                                (!prev.button_text ||
+                                  prev.button_text === 'Shop Now' ||
+                                  prev.button_text.startsWith('Shop') ||
+                                  prev.button_text.startsWith('Buy'))
+                                  ? suggestedText
+                                  : prev.button_text,
+                            }));
+                          }}
+                          categories={categories}
+                          products={products}
+                          defaultSuggestedText="Shop Now"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="banner-sec-btn-text" className="text-xs">
+                          Secondary Button Text
+                        </Label>
+                        <Input
+                          id="banner-sec-btn-text"
+                          placeholder="Our Story"
+                          value={bannerForm.secondary_button_text}
+                          onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_text: e.target.value })}
+                          className="text-xs mt-1"
+                        />
+                      </div>
+
+                      <div>
+                        <BannerLinkSelector
+                          id="banner-sec-btn-link"
+                          label="Secondary Button Destination"
+                          value={bannerForm.secondary_button_link}
+                          onChange={(url, suggestedText) => {
+                            setBannerForm((prev) => ({
+                              ...prev,
+                              secondary_button_link: url,
+                              secondary_button_text:
+                                suggestedText &&
+                                (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                                  ? suggestedText
+                                  : prev.secondary_button_text,
+                            }));
+                          }}
+                          categories={categories}
+                          products={products}
+                          defaultSuggestedText="Our Story"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pt-1">
+                      <BannerLinkSelector
+                        id="banner-btn-link"
+                        label="Banner Click Destination (Where should clicking this banner take the customer?)"
+                        value={bannerForm.button_link || '/products'}
+                        onChange={(url) => {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            button_link: url,
+                          }));
+                        }}
+                        categories={categories}
+                        products={products}
+                      />
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        ✓ Buttons are hidden. Clicking anywhere on this 16:9 banner image will open this destination.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
+                  <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -3831,7 +3846,7 @@ export default function Admin() {
                       </span>
                     </label>
 
-                    {editBannerForm.show_buttons && (
+                    {editBannerForm.show_buttons ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <div>
                           <Label className="text-[11px] text-muted-foreground">Primary Button Text</Label>
@@ -3848,19 +3863,6 @@ export default function Admin() {
                             id="edit-banner-primary-link"
                             label="Primary Button Destination"
                             value={editBannerForm.button_link}
-                            isCleanPoster={editBannerForm.hide_overlay}
-                            onCleanPosterToggle={(isClean) => {
-                              setEditBannerForm((prev) => ({
-                                ...prev,
-                                hide_overlay: isClean,
-                                show_buttons: !isClean,
-                                title: isClean ? '' : prev.title,
-                                subtitle: isClean ? '' : prev.subtitle,
-                                badge_text: isClean ? '' : prev.badge_text,
-                                button_text: isClean ? '' : (prev.button_text || 'Shop Now'),
-                                button_link: isClean ? '' : prev.button_link,
-                              }));
-                            }}
                             onChange={(url, suggestedText) =>
                               setEditBannerForm((prev) => ({
                                 ...prev,
@@ -3914,6 +3916,25 @@ export default function Admin() {
                             defaultSuggestedText="Our Story"
                           />
                         </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 pt-1">
+                        <BannerLinkSelector
+                          id="edit-banner-primary-link"
+                          label="Banner Click Destination (Where should clicking this banner take the customer?)"
+                          value={editBannerForm.button_link || '/products'}
+                          onChange={(url) =>
+                            setEditBannerForm((prev) => ({
+                              ...prev,
+                              button_link: url,
+                            }))
+                          }
+                          categories={categories}
+                          products={products}
+                        />
+                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ Buttons are hidden. Clicking anywhere on this 16:9 banner image will open this destination.
+                        </p>
                       </div>
                     )}
                   </div>

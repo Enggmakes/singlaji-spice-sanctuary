@@ -122,9 +122,9 @@ export default function HeroBannerSlider() {
   const hasText = !isCleanGraphicMode && Boolean(currentBanner.title?.trim() || currentBanner.subtitle?.trim() || currentBanner.badge_text?.trim());
   const hasOverlay = !isCleanGraphicMode && (hasText || showButtons);
   const primaryBtnText = currentBanner.button_text || 'Shop Now';
-  const primaryBtnLink = isCleanGraphicMode ? (currentBanner.button_link || '') : (currentBanner.button_link || '/products');
+  const primaryBtnLink = currentBanner.button_link?.trim() || '/products';
   const secondaryBtnText = currentBanner.secondary_button_text || 'Our Story';
-  const secondaryBtnLink = currentBanner.secondary_button_link || '/about';
+  const secondaryBtnLink = currentBanner.secondary_button_link?.trim() || '/about';
 
   // Slide animation variants
   const slideVariants = {
@@ -144,7 +144,7 @@ export default function HeroBannerSlider() {
 
   return (
     <section
-      className="relative w-full aspect-[16/9] max-h-[78vh] min-h-[220px] sm:min-h-[340px] md:min-h-[460px] lg:min-h-[560px] overflow-hidden select-none bg-stone-900 group"
+      className="relative w-full max-w-[1920px] mx-auto aspect-[16/9] overflow-hidden select-none bg-stone-900 group"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -182,11 +182,21 @@ export default function HeroBannerSlider() {
 
             {/* Direct banner background link if buttons are disabled (e.g. clean festival/ad poster) */}
             {!showButtons && primaryBtnLink && (
-              <Link
-                to={primaryBtnLink}
-                className="absolute inset-0 z-10 cursor-pointer"
-                aria-label={currentBanner.title || 'View Promotion'}
-              />
+              primaryBtnLink.startsWith('http://') || primaryBtnLink.startsWith('https://') ? (
+                <a
+                  href={primaryBtnLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute inset-0 z-10 cursor-pointer"
+                  aria-label={currentBanner.title || 'View Promotion'}
+                />
+              ) : (
+                <Link
+                  to={primaryBtnLink}
+                  className="absolute inset-0 z-10 cursor-pointer"
+                  aria-label={currentBanner.title || 'View Promotion'}
+                />
+              )
             )}
           </div>
 
@@ -230,22 +240,37 @@ export default function HeroBannerSlider() {
                         size="sm"
                         className="sm:h-11 sm:px-6 sm:text-base text-xs h-8 px-3.5 shadow-lg shadow-black/20"
                       >
-                        <Link to={primaryBtnLink}>
-                          {primaryBtnText}
-                          <ArrowRight className="ml-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </Link>
+                        {primaryBtnLink.startsWith('http://') || primaryBtnLink.startsWith('https://') ? (
+                          <a href={primaryBtnLink} target="_blank" rel="noopener noreferrer">
+                            {primaryBtnText}
+                            <ArrowRight className="ml-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </a>
+                        ) : (
+                          <Link to={primaryBtnLink}>
+                            {primaryBtnText}
+                            <ArrowRight className="ml-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </Link>
+                        )}
                       </Button>
 
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="sm:h-11 sm:px-6 sm:text-base text-xs h-8 px-3.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm shadow-sm"
-                      >
-                        <Link to={secondaryBtnLink}>
-                          {secondaryBtnText}
-                        </Link>
-                      </Button>
+                      {secondaryBtnText && secondaryBtnLink && (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="sm:h-11 sm:px-6 sm:text-base text-xs h-8 px-3.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm shadow-sm"
+                        >
+                          {secondaryBtnLink.startsWith('http://') || secondaryBtnLink.startsWith('https://') ? (
+                            <a href={secondaryBtnLink} target="_blank" rel="noopener noreferrer">
+                              {secondaryBtnText}
+                            </a>
+                          ) : (
+                            <Link to={secondaryBtnLink}>
+                              {secondaryBtnText}
+                            </Link>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </motion.div>

@@ -18,9 +18,6 @@ interface BannerLinkSelectorProps {
   categories?: Array<{ id: string; name: string; slug?: string }>;
   products?: Array<{ id: string; name: string; slug?: string; price?: number }>;
   defaultSuggestedText?: string;
-  isCleanPoster?: boolean;
-  onCleanPosterToggle?: (isClean: boolean) => void;
-  onSelectCleanGraphic?: () => void;
 }
 
 export default function BannerLinkSelector({
@@ -31,9 +28,6 @@ export default function BannerLinkSelector({
   categories = [],
   products = [],
   defaultSuggestedText,
-  isCleanPoster,
-  onCleanPosterToggle,
-  onSelectCleanGraphic,
 }: BannerLinkSelectorProps) {
   // Build dynamic standard pages
   const standardPages: BannerLinkOption[] = [
@@ -73,16 +67,12 @@ export default function BannerLinkSelector({
   const isCustom = !matchedPreset && Boolean(value);
 
   const [selectedDropdownValue, setSelectedDropdownValue] = useState<string>(
-    isCleanPoster ? '__clean_ad_poster__' : matchedPreset ? matchedPreset.value : value ? '__custom__' : '/products'
+    matchedPreset ? matchedPreset.value : value ? '__custom__' : '/products'
   );
   const [customInputValue, setCustomInputValue] = useState<string>(isCustom ? value : '');
 
   // Keep state in sync with external value changes
   useEffect(() => {
-    if (isCleanPoster) {
-      setSelectedDropdownValue('__clean_ad_poster__');
-      return;
-    }
     const match = allPresetOptions.find((opt) => opt.value === value);
     if (match) {
       setSelectedDropdownValue(match.value);
@@ -92,31 +82,19 @@ export default function BannerLinkSelector({
     } else {
       setSelectedDropdownValue('/products');
     }
-  }, [value, categories, products, isCleanPoster]);
+  }, [value, categories, products]);
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
     setSelectedDropdownValue(selected);
 
-    if (selected === '__clean_ad_poster__') {
-      if (onCleanPosterToggle) {
-        onCleanPosterToggle(true);
-      } else if (onSelectCleanGraphic) {
-        onSelectCleanGraphic();
-      }
-      onChange('', '');
+    if (selected === '__custom__') {
+      const customVal = customInputValue || '/products';
+      onChange(customVal, defaultSuggestedText || 'Explore');
     } else {
-      if (onCleanPosterToggle) {
-        onCleanPosterToggle(false);
-      }
-      if (selected === '__custom__') {
-        const customVal = customInputValue || '/';
-        onChange(customVal, defaultSuggestedText || 'Explore');
-      } else {
-        const match = allPresetOptions.find((opt) => opt.value === selected);
-        if (match) {
-          onChange(match.value, match.suggestedButtonText);
-        }
+      const match = allPresetOptions.find((opt) => opt.value === selected);
+      if (match) {
+        onChange(match.value, match.suggestedButtonText);
       }
     }
   };
@@ -146,12 +124,6 @@ export default function BannerLinkSelector({
           onChange={handleSelectChange}
           className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium text-foreground cursor-pointer"
         >
-          {(onCleanPosterToggle || onSelectCleanGraphic) && (
-            <option value="__clean_ad_poster__">
-              🎨 No Text, No Button, No Shadow (Festival / Ad Poster)
-            </option>
-          )}
-
           <optgroup label="📌 Standard Store Pages">
             {standardPages.map((opt) => (
               <option key={opt.value} value={opt.value}>
