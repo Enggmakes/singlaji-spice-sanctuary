@@ -117,14 +117,16 @@ export default function HeroBannerSlider() {
   };
 
   const currentBanner = banners[currentIndex] || banners[0] || DEFAULT_BANNERS[0];
-  const isCleanGraphicMode = currentBanner.hide_overlay === true || (!currentBanner.title?.trim() && !currentBanner.subtitle?.trim() && !currentBanner.badge_text?.trim() && currentBanner.show_buttons === false);
-  const showButtons = !isCleanGraphicMode && currentBanner.show_buttons !== false;
-  const hasText = !isCleanGraphicMode && Boolean(currentBanner.title?.trim() || currentBanner.subtitle?.trim() || currentBanner.badge_text?.trim());
+  const rawPrimaryLink = (currentBanner.button_link || '').trim();
+  const isNoLink = !rawPrimaryLink || rawPrimaryLink === 'none' || rawPrimaryLink === '#';
+  const isCleanGraphicMode = currentBanner.hide_overlay === true || isNoLink || (!currentBanner.title?.trim() && !currentBanner.subtitle?.trim() && !currentBanner.badge_text?.trim() && currentBanner.show_buttons === false);
+  const showButtons = !isCleanGraphicMode && currentBanner.show_buttons !== false && !isNoLink;
+  const hasText = !isCleanGraphicMode && !isNoLink && Boolean(currentBanner.title?.trim() || currentBanner.subtitle?.trim() || currentBanner.badge_text?.trim());
   const hasOverlay = !isCleanGraphicMode && (hasText || showButtons);
   const primaryBtnText = currentBanner.button_text || 'Shop Now';
-  const primaryBtnLink = currentBanner.button_link?.trim() || '/products';
+  const primaryBtnLink = isNoLink ? '' : rawPrimaryLink;
   const secondaryBtnText = currentBanner.secondary_button_text || 'Our Story';
-  const secondaryBtnLink = currentBanner.secondary_button_link?.trim() || '/about';
+  const secondaryBtnLink = (currentBanner.secondary_button_link?.trim() === 'none' ? '' : currentBanner.secondary_button_link?.trim()) || '/about';
 
   // Slide animation variants
   const slideVariants = {
@@ -181,7 +183,7 @@ export default function HeroBannerSlider() {
             ) : null}
 
             {/* Direct banner background link if buttons are disabled (e.g. clean festival/ad poster) */}
-            {!showButtons && primaryBtnLink && (
+            {!showButtons && !isNoLink && primaryBtnLink && (
               primaryBtnLink.startsWith('http://') || primaryBtnLink.startsWith('https://') ? (
                 <a
                   href={primaryBtnLink}

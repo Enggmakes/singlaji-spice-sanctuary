@@ -207,17 +207,19 @@ export async function syncLocalBannersToSupabase(): Promise<HeroBanner[]> {
       }
     }
 
+    const isNone = b.button_link === 'none';
     const payload = {
       id: b.id,
       image_url: finalImageUrl,
       badge_text: b.badge_text || null,
       title: b.title || null,
       subtitle: b.subtitle || null,
-      button_text: b.button_text || 'Shop Now',
-      button_link: b.button_link || '/products',
-      secondary_button_text: b.secondary_button_text || 'Our Story',
-      secondary_button_link: b.secondary_button_link || '/about',
-      show_buttons: b.show_buttons !== false,
+      button_text: isNone ? '' : (b.button_text || 'Shop Now'),
+      button_link: isNone ? 'none' : (b.button_link || '/products'),
+      secondary_button_text: isNone ? '' : (b.secondary_button_text || 'Our Story'),
+      secondary_button_link: isNone ? 'none' : (b.secondary_button_link || '/about'),
+      show_buttons: isNone ? false : (b.show_buttons !== false),
+      hide_overlay: isNone ? true : Boolean(b.hide_overlay),
       sort_order: b.sort_order || 1,
       is_active: b.is_active,
       aspect_ratio: b.aspect_ratio || '2.4:1',

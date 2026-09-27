@@ -1529,17 +1529,18 @@ export default function Admin() {
         });
       }
 
+      const isNone = bannerForm.button_link === 'none';
       await createHeroBanner({
         image_url: finalImageUrl,
-        title: bannerForm.hide_overlay ? undefined : bannerForm.title.trim() || undefined,
-        subtitle: bannerForm.hide_overlay ? undefined : bannerForm.subtitle.trim() || undefined,
-        badge_text: bannerForm.hide_overlay ? undefined : bannerForm.badge_text.trim() || undefined,
-        button_text: bannerForm.show_buttons ? (bannerForm.button_text.trim() || 'Shop Now') : '',
-        button_link: bannerForm.button_link?.trim() || '/products',
-        secondary_button_text: bannerForm.show_buttons ? (bannerForm.secondary_button_text.trim() || 'Our Story') : '',
-        secondary_button_link: bannerForm.show_buttons ? bannerForm.secondary_button_link.trim() : '',
-        show_buttons: bannerForm.show_buttons !== false,
-        hide_overlay: bannerForm.hide_overlay,
+        title: bannerForm.hide_overlay || isNone ? undefined : bannerForm.title.trim() || undefined,
+        subtitle: bannerForm.hide_overlay || isNone ? undefined : bannerForm.subtitle.trim() || undefined,
+        badge_text: bannerForm.hide_overlay || isNone ? undefined : bannerForm.badge_text.trim() || undefined,
+        button_text: isNone || !bannerForm.show_buttons ? '' : (bannerForm.button_text.trim() || 'Shop Now'),
+        button_link: isNone ? 'none' : (bannerForm.button_link?.trim() || '/products'),
+        secondary_button_text: isNone || !bannerForm.show_buttons ? '' : (bannerForm.secondary_button_text.trim() || 'Our Story'),
+        secondary_button_link: isNone || !bannerForm.show_buttons ? '' : (bannerForm.secondary_button_link.trim() || ''),
+        show_buttons: isNone ? false : (bannerForm.show_buttons !== false),
+        hide_overlay: isNone ? true : Boolean(bannerForm.hide_overlay),
         sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
         is_active: bannerForm.is_active,
         aspect_ratio: '2.4:1',
@@ -1633,17 +1634,18 @@ export default function Admin() {
 
   const handleStartEditBanner = (banner: HeroBanner) => {
     setEditingBanner(banner);
+    const isNoLink = banner.button_link === 'none' || (!banner.button_link && banner.show_buttons === false);
     setEditBannerForm({
       id: banner.id,
       title: banner.title || '',
       subtitle: banner.subtitle || '',
       badge_text: banner.badge_text || '',
       button_text: banner.button_text ?? '',
-      button_link: banner.button_link ?? '',
+      button_link: isNoLink ? 'none' : (banner.button_link || '/products'),
       secondary_button_text: banner.secondary_button_text ?? '',
       secondary_button_link: banner.secondary_button_link ?? '',
-      show_buttons: banner.show_buttons !== false,
-      hide_overlay: banner.hide_overlay ?? (!banner.title && !banner.subtitle && banner.show_buttons === false),
+      show_buttons: isNoLink ? false : (banner.show_buttons !== false),
+      hide_overlay: banner.hide_overlay ?? isNoLink,
       sort_order: banner.sort_order || 1,
       is_active: banner.is_active,
       current_image_url: banner.image_url,
@@ -1710,17 +1712,18 @@ export default function Admin() {
         }
       }
 
+      const isNone = editBannerForm.button_link === 'none';
       await updateHeroBanner(editingBanner.id, {
         image_url: finalImageUrl,
-        title: editBannerForm.hide_overlay ? undefined : editBannerForm.title.trim() || undefined,
-        subtitle: editBannerForm.hide_overlay ? undefined : editBannerForm.subtitle.trim() || undefined,
-        badge_text: editBannerForm.hide_overlay ? undefined : editBannerForm.badge_text.trim() || undefined,
-        button_text: editBannerForm.show_buttons ? (editBannerForm.button_text.trim() || 'Shop Now') : '',
-        button_link: editBannerForm.button_link?.trim() || '/products',
-        secondary_button_text: editBannerForm.show_buttons ? (editBannerForm.secondary_button_text.trim() || 'Our Story') : '',
-        secondary_button_link: editBannerForm.show_buttons ? editBannerForm.secondary_button_link.trim() : '',
-        show_buttons: editBannerForm.show_buttons !== false,
-        hide_overlay: editBannerForm.hide_overlay,
+        title: editBannerForm.hide_overlay || isNone ? undefined : editBannerForm.title.trim() || undefined,
+        subtitle: editBannerForm.hide_overlay || isNone ? undefined : editBannerForm.subtitle.trim() || undefined,
+        badge_text: editBannerForm.hide_overlay || isNone ? undefined : editBannerForm.badge_text.trim() || undefined,
+        button_text: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.button_text.trim() || 'Shop Now'),
+        button_link: isNone ? 'none' : (editBannerForm.button_link?.trim() || '/products'),
+        secondary_button_text: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.secondary_button_text.trim() || 'Our Story'),
+        secondary_button_link: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.secondary_button_link.trim() || ''),
+        show_buttons: isNone ? false : (editBannerForm.show_buttons !== false),
+        hide_overlay: isNone ? true : Boolean(editBannerForm.hide_overlay),
         sort_order: Number(editBannerForm.sort_order) || 1,
         is_active: editBannerForm.is_active,
       });
@@ -2899,18 +2902,32 @@ export default function Admin() {
                       label="Primary Button Destination"
                       value={bannerForm.button_link}
                       onChange={(url, suggestedText) => {
-                        setBannerForm((prev) => ({
-                          ...prev,
-                          button_link: url,
-                          button_text:
-                            suggestedText &&
-                            (!prev.button_text ||
-                              prev.button_text === 'Shop Now' ||
-                              prev.button_text.startsWith('Shop') ||
-                              prev.button_text.startsWith('Buy'))
-                              ? suggestedText
-                              : prev.button_text,
-                        }));
+                        if (url === 'none') {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            button_link: 'none',
+                            button_text: '',
+                            secondary_button_text: '',
+                            secondary_button_link: 'none',
+                            show_buttons: false,
+                            hide_overlay: true,
+                          }));
+                        } else {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            button_link: url,
+                            hide_overlay: false,
+                            show_buttons: true,
+                            button_text:
+                              suggestedText &&
+                              (!prev.button_text ||
+                                prev.button_text === 'Shop Now' ||
+                                prev.button_text.startsWith('Shop') ||
+                                prev.button_text.startsWith('Buy'))
+                                ? suggestedText
+                                : prev.button_text || 'Shop Now',
+                          }));
+                        }
                       }}
                       categories={categories}
                       products={products}
@@ -2937,15 +2954,23 @@ export default function Admin() {
                       label="Secondary Button Destination"
                       value={bannerForm.secondary_button_link}
                       onChange={(url, suggestedText) => {
-                        setBannerForm((prev) => ({
-                          ...prev,
-                          secondary_button_link: url,
-                          secondary_button_text:
-                            suggestedText &&
-                            (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
-                              ? suggestedText
-                              : prev.secondary_button_text,
-                        }));
+                        if (url === 'none') {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            secondary_button_link: 'none',
+                            secondary_button_text: '',
+                          }));
+                        } else {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            secondary_button_link: url,
+                            secondary_button_text:
+                              suggestedText &&
+                              (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                                ? suggestedText
+                                : prev.secondary_button_text || 'Our Story',
+                          }));
+                        }
                       }}
                       categories={categories}
                       products={products}
@@ -3097,14 +3122,14 @@ export default function Admin() {
                           )}
 
                           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                            {b.button_link ? (
+                            {b.button_link && b.button_link !== 'none' ? (
                               <span className="flex items-center gap-1 font-mono text-primary truncate max-w-xs">
                                 <ExternalLink className="h-3 w-3 shrink-0" />
                                 {b.button_link}
                               </span>
                             ) : (
-                              <span className="text-[11px] text-muted-foreground/70 italic">
-                                No Link (Display Only)
+                              <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium italic">
+                                🚫 No Link (Display Only)
                               </span>
                             )}
                             {b.badge_text && (
@@ -3820,20 +3845,34 @@ export default function Admin() {
                           id="edit-banner-primary-link"
                           label="Primary Button Destination"
                           value={editBannerForm.button_link}
-                          onChange={(url, suggestedText) =>
-                            setEditBannerForm((prev) => ({
-                              ...prev,
-                              button_link: url,
-                              button_text:
-                                suggestedText &&
-                                (!prev.button_text ||
-                                  prev.button_text === 'Shop Now' ||
-                                  prev.button_text.startsWith('Shop') ||
-                                  prev.button_text.startsWith('Buy'))
-                                  ? suggestedText
-                                  : prev.button_text,
-                            }))
-                          }
+                          onChange={(url, suggestedText) => {
+                            if (url === 'none') {
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                button_link: 'none',
+                                button_text: '',
+                                secondary_button_text: '',
+                                secondary_button_link: 'none',
+                                show_buttons: false,
+                                hide_overlay: true,
+                              }));
+                            } else {
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                button_link: url,
+                                hide_overlay: false,
+                                show_buttons: true,
+                                button_text:
+                                  suggestedText &&
+                                  (!prev.button_text ||
+                                    prev.button_text === 'Shop Now' ||
+                                    prev.button_text.startsWith('Shop') ||
+                                    prev.button_text.startsWith('Buy'))
+                                    ? suggestedText
+                                    : prev.button_text || 'Shop Now',
+                              }));
+                            }
+                          }}
                           categories={categories}
                           products={products}
                           defaultSuggestedText="Shop Now"
@@ -3857,17 +3896,25 @@ export default function Admin() {
                           id="edit-banner-secondary-link"
                           label="Secondary Button Destination"
                           value={editBannerForm.secondary_button_link}
-                          onChange={(url, suggestedText) =>
-                            setEditBannerForm((prev) => ({
-                              ...prev,
-                              secondary_button_link: url,
-                              secondary_button_text:
-                                suggestedText &&
-                                (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
-                                  ? suggestedText
-                                  : prev.secondary_button_text,
-                            }))
-                          }
+                          onChange={(url, suggestedText) => {
+                            if (url === 'none') {
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                secondary_button_link: 'none',
+                                secondary_button_text: '',
+                              }));
+                            } else {
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                secondary_button_link: url,
+                                secondary_button_text:
+                                  suggestedText &&
+                                  (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                                    ? suggestedText
+                                    : prev.secondary_button_text || 'Our Story',
+                              }));
+                            }
+                          }}
                           categories={categories}
                           products={products}
                           defaultSuggestedText="Our Story"

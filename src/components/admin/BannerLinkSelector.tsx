@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Compass, ShoppingBag, BookOpen, ShoppingCart, Truck, Tag, ExternalLink } from 'lucide-react';
+import { Compass, ExternalLink } from 'lucide-react';
 
 export interface BannerLinkOption {
   label: string;
   value: string;
   suggestedButtonText: string;
-  group: 'pages' | 'categories' | 'products' | 'custom';
+  group: 'display' | 'pages' | 'categories' | 'products' | 'custom';
 }
 
 interface BannerLinkSelectorProps {
@@ -29,6 +29,14 @@ export default function BannerLinkSelector({
   products = [],
   defaultSuggestedText,
 }: BannerLinkSelectorProps) {
+  // Option for display-only banners (no link, no button, no text)
+  const displayOnlyOption: BannerLinkOption = {
+    label: '🚫 No Link, No Buttons, No Text (Display Only)',
+    value: 'none',
+    suggestedButtonText: '',
+    group: 'display',
+  };
+
   // Build dynamic standard pages
   const standardPages: BannerLinkOption[] = [
     { label: 'All Products (Catalog)', value: '/products', suggestedButtonText: 'Shop Now', group: 'pages' },
@@ -60,19 +68,24 @@ export default function BannerLinkSelector({
     };
   });
 
-  const allPresetOptions = [...standardPages, ...categoryOptions, ...productOptions];
+  const allPresetOptions = [displayOnlyOption, ...standardPages, ...categoryOptions, ...productOptions];
 
   // Determine current mode: matching preset or custom
   const matchedPreset = allPresetOptions.find((opt) => opt.value === value);
-  const isCustom = !matchedPreset && Boolean(value);
+  const isCustom = !matchedPreset && Boolean(value && value !== 'none');
 
   const [selectedDropdownValue, setSelectedDropdownValue] = useState<string>(
-    matchedPreset ? matchedPreset.value : value ? '__custom__' : '/products'
+    value === 'none' ? 'none' : (matchedPreset ? matchedPreset.value : value ? '__custom__' : '/products')
   );
   const [customInputValue, setCustomInputValue] = useState<string>(isCustom ? value : '');
 
   // Keep state in sync with external value changes
   useEffect(() => {
+    if (value === 'none') {
+      setSelectedDropdownValue('none');
+      setCustomInputValue('');
+      return;
+    }
     const match = allPresetOptions.find((opt) => opt.value === value);
     if (match) {
       setSelectedDropdownValue(match.value);
@@ -88,7 +101,9 @@ export default function BannerLinkSelector({
     const selected = e.target.value;
     setSelectedDropdownValue(selected);
 
-    if (selected === '__custom__') {
+    if (selected === 'none') {
+      onChange('none', '');
+    } else if (selected === '__custom__') {
       const customVal = customInputValue || '/products';
       onChange(customVal, defaultSuggestedText || 'Explore');
     } else {
@@ -113,7 +128,11 @@ export default function BannerLinkSelector({
           {label}
         </Label>
         <span className="text-[10px] text-muted-foreground font-mono">
-          {selectedDropdownValue === '__custom__' ? 'Custom URL' : 'Dynamic Auto-Route'}
+          {selectedDropdownValue === 'none'
+            ? '🚫 No Link (Display Only)'
+            : selectedDropdownValue === '__custom__'
+            ? 'Custom URL'
+            : 'Dynamic Auto-Route'}
         </span>
       </div>
 
@@ -124,6 +143,12 @@ export default function BannerLinkSelector({
           onChange={handleSelectChange}
           className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium text-foreground cursor-pointer"
         >
+          <optgroup label="🚫 Display Only / Clean Banner">
+            <option value="none">
+              🚫 No Link, No Buttons, No Text (Display Only)
+            </option>
+          </optgroup>
+
           <optgroup label="📌 Standard Store Pages">
             {standardPages.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -157,6 +182,12 @@ export default function BannerLinkSelector({
           </optgroup>
         </select>
       </div>
+
+      {selectedDropdownValue === 'none' && (
+        <p className="text-[10px] text-muted-foreground font-medium">
+          💡 Banner will be shown as a clean display image with no buttons, text overlays, or click links.
+        </p>
+      )}
 
       {selectedDropdownValue === '__custom__' && (
         <div className="pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
