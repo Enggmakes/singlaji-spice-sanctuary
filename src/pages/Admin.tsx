@@ -2717,125 +2717,126 @@ export default function Admin() {
               </div>
 
               <form onSubmit={handleCreateBanner} className="space-y-6">
-                {/* Image Upload Area with Strict 2.4:1 / 21:9 Checker */}
-                <div className="space-y-3">
-                  <Label htmlFor="hero-banner-image-input" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-primary" />
-                    Banner Graphic File <span className="text-destructive font-bold">* (Standard 2.4:1 / 21:9 Ratio - 1920×800)</span>
-                  </Label>
+                {/* Image Upload Area & Live Preview aligned side by side on one line */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  {/* Left Column: Drop / Select Area */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between min-h-[22px]">
+                      <Label htmlFor="hero-banner-image-input" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-primary" />
+                        <span>Banner Graphic File <span className="text-destructive font-bold">* (2.4:1 / 21:9 - 1920×800)</span></span>
+                      </Label>
+                    </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                    {/* File Drop / Select Area */}
-                    <div className="lg:col-span-6 space-y-3">
-                      <div className="border-2 border-dashed border-border rounded-xl p-5 hover:border-primary/50 transition-colors bg-muted/20 text-center space-y-3">
-                        <input
-                          id="hero-banner-image-input"
-                          type="file"
-                          accept="image/png, image/jpeg, image/webp"
-                          onChange={handleBannerImageSelect}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor="hero-banner-image-input"
-                          className="cursor-pointer inline-flex flex-col items-center justify-center gap-2"
-                        >
-                          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                            <Upload className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <span className="text-sm font-semibold text-primary hover:underline">
-                              Click to select 2.4:1 / 21:9 image
-                            </span>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              JPEG, PNG, or WebP • Recommended: 1920 × 800 (or 21:9)
-                            </p>
-                          </div>
-                        </label>
-                      </div>
+                    <div className="w-full aspect-[2.4/1] border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors bg-muted/20 relative flex flex-col items-center justify-center text-center p-3">
+                      <input
+                        id="hero-banner-image-input"
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        onChange={handleBannerImageSelect}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="hero-banner-image-input"
+                        className="cursor-pointer inline-flex flex-col items-center justify-center gap-1.5"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-xs sm:text-sm font-semibold text-primary hover:underline">
+                            {bannerImageFile ? 'Click to change 2.4:1 image' : 'Click to select 2.4:1 / 21:9 image'}
+                          </span>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            JPEG, PNG, or WebP • Recommended: 1920 × 800 (or 21:9)
+                          </p>
+                        </div>
+                      </label>
 
-                      {/* Ratio Validation Feedback Messages */}
-                      {bannerValidationState.error && (
-                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2 animate-in fade-in">
-                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold">Image Upload Rejected</p>
-                            <p className="mt-0.5 leading-relaxed">{bannerValidationState.error}</p>
-                          </div>
+                      {/* Status Overlay inside dropzone at the bottom so height never shifts */}
+                      {bannerValidationState.isValid && bannerValidationState.width && (
+                        <div className="absolute bottom-2 inset-x-2 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-[11px] font-medium flex items-center justify-between backdrop-blur-sm">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span>2.4:1 Verified</span>
+                          </span>
+                          <span className="font-mono text-[10px] opacity-90">
+                            {bannerValidationState.width} × {bannerValidationState.height} ({(bannerValidationState.ratio || 0).toFixed(2)}:1)
+                          </span>
                         </div>
                       )}
 
-                      {bannerValidationState.isValid && bannerValidationState.width && (
-                        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
-                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                          <div>
-                            <span className="font-bold">2.4:1 (21:9) Aspect Ratio Verified!</span>
-                            <span className="ml-1.5 opacity-90">
-                              Resolution: {bannerValidationState.width} × {bannerValidationState.height} ({(bannerValidationState.ratio || 0).toFixed(2)}:1)
-                            </span>
-                          </div>
+                      {bannerValidationState.error && (
+                        <div className="absolute bottom-2 inset-x-2 px-2.5 py-1 rounded-md bg-destructive/15 border border-destructive/30 text-destructive text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-sm">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{bannerValidationState.error}</span>
                         </div>
                       )}
                     </div>
+                  </div>
 
-                    {/* Live 2.4:1 Preview Box */}
-                    <div className="lg:col-span-6 space-y-2">
-                      <Label className="text-xs font-semibold text-muted-foreground">
-                        Live 2.4:1 Storefront Preview
+                  {/* Right Column: Live 2.4:1 Preview Box */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between min-h-[22px]">
+                      <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                        <Eye className="w-3.5 h-3.5 text-primary" />
+                        <span>Live 2.4:1 Storefront Preview</span>
                       </Label>
-                      <div className="w-full aspect-[2.4/1] rounded-xl border border-border bg-stone-900 relative overflow-hidden flex items-center justify-center shadow-inner group">
-                        {bannerImagePreview ? (
-                          <>
-                            <img
-                              src={bannerImagePreview}
-                              alt="2.4:1 Banner Preview"
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Overlay simulator with buttons (Hidden if Clean Festival / Ad Poster mode is selected) */}
-                            {!bannerForm.hide_overlay && (bannerForm.title || bannerForm.subtitle || bannerForm.badge_text || bannerForm.show_buttons) && (
-                              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left pointer-events-none">
-                                <div className="max-w-xs space-y-1.5">
-                                  {bannerForm.badge_text && (
-                                    <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
-                                      {bannerForm.badge_text}
+                    </div>
+
+                    <div className="w-full aspect-[2.4/1] rounded-xl border border-border bg-stone-900 relative overflow-hidden flex items-center justify-center shadow-inner group">
+                      {bannerImagePreview ? (
+                        <>
+                          <img
+                            src={bannerImagePreview}
+                            alt="2.4:1 Banner Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Overlay simulator with buttons (Hidden if Clean Festival / Ad Poster mode is selected) */}
+                          {!bannerForm.hide_overlay && (bannerForm.title || bannerForm.subtitle || bannerForm.badge_text || bannerForm.show_buttons) && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left pointer-events-none">
+                              <div className="max-w-xs space-y-1.5">
+                                {bannerForm.badge_text && (
+                                  <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
+                                    {bannerForm.badge_text}
+                                  </span>
+                                )}
+                                {bannerForm.title && (
+                                  <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight whitespace-pre-line">
+                                    {bannerForm.title}
+                                  </h4>
+                                )}
+                                {bannerForm.subtitle && (
+                                  <p className="text-[10px] text-white/80 line-clamp-3 leading-relaxed whitespace-pre-line">
+                                    {bannerForm.subtitle}
+                                  </p>
+                                )}
+                                {bannerForm.show_buttons && (
+                                  <div className="flex items-center gap-1.5 pt-1">
+                                    <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
+                                      {bannerForm.button_text || 'Shop Now'} →
                                     </span>
-                                  )}
-                                  {bannerForm.title && (
-                                    <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight whitespace-pre-line">
-                                      {bannerForm.title}
-                                    </h4>
-                                  )}
-                                  {bannerForm.subtitle && (
-                                    <p className="text-[10px] text-white/80 line-clamp-3 leading-relaxed whitespace-pre-line">
-                                      {bannerForm.subtitle}
-                                    </p>
-                                  )}
-                                  {bannerForm.show_buttons && (
-                                    <div className="flex items-center gap-1.5 pt-1">
-                                      <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
-                                        {bannerForm.button_text || 'Shop Now'} →
-                                      </span>
-                                      <span className="inline-block px-2 py-1 bg-white/15 border border-white/30 text-white text-[10px] font-medium rounded-md shadow-sm">
-                                        {bannerForm.secondary_button_text || 'Our Story'}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                                    <span className="inline-block px-2 py-1 bg-white/15 border border-white/30 text-white text-[10px] font-medium rounded-md shadow-sm">
+                                      {bannerForm.secondary_button_text || 'Our Story'}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
-                              2.4:1 • {bannerValidationState.width}×{bannerValidationState.height}
                             </div>
-                          </>
-                        ) : (
-                          <div className="text-center p-6 text-muted-foreground space-y-2">
-                            <ImageIcon className="w-8 h-8 mx-auto opacity-40" />
-                            <p className="text-xs">No image selected</p>
-                            <p className="text-[10px] opacity-70">
-                              2.4:1 preview will appear here once a valid 2.4:1 / 21:9 file is selected
-                            </p>
+                          )}
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
+                            2.4:1 • {bannerValidationState.width}×{bannerValidationState.height}
                           </div>
-                        )}
-                      </div>
+                        </>
+                      ) : (
+                        <div className="text-center p-6 text-muted-foreground space-y-2">
+                          <ImageIcon className="w-8 h-8 mx-auto opacity-40" />
+                          <p className="text-xs">No image selected</p>
+                          <p className="text-[10px] opacity-70">
+                            2.4:1 preview will appear here once a valid 2.4:1 / 21:9 file is selected
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
