@@ -1534,10 +1534,10 @@ export default function Admin() {
         title: bannerForm.hide_overlay ? undefined : bannerForm.title.trim() || undefined,
         subtitle: bannerForm.hide_overlay ? undefined : bannerForm.subtitle.trim() || undefined,
         badge_text: bannerForm.hide_overlay ? undefined : bannerForm.badge_text.trim() || undefined,
-        button_text: bannerForm.button_text.trim() || 'Shop Now',
-        button_link: bannerForm.button_link.trim() || '/products',
-        secondary_button_text: bannerForm.secondary_button_text.trim() || 'Our Story',
-        secondary_button_link: bannerForm.secondary_button_link.trim() || '/about',
+        button_text: bannerForm.hide_overlay ? '' : (bannerForm.button_text.trim() || 'Shop Now'),
+        button_link: bannerForm.hide_overlay ? (bannerForm.button_link === '/products' ? '' : bannerForm.button_link.trim()) : bannerForm.button_link.trim(),
+        secondary_button_text: bannerForm.hide_overlay ? '' : (bannerForm.secondary_button_text.trim() || 'Our Story'),
+        secondary_button_link: bannerForm.hide_overlay ? '' : bannerForm.secondary_button_link.trim(),
         show_buttons: !bannerForm.hide_overlay && bannerForm.show_buttons !== false,
         hide_overlay: bannerForm.hide_overlay,
         sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
@@ -1638,10 +1638,10 @@ export default function Admin() {
       title: banner.title || '',
       subtitle: banner.subtitle || '',
       badge_text: banner.badge_text || '',
-      button_text: banner.button_text || 'Shop Now',
-      button_link: banner.button_link || '/products',
-      secondary_button_text: banner.secondary_button_text || 'Our Story',
-      secondary_button_link: banner.secondary_button_link || '/about',
+      button_text: banner.button_text ?? '',
+      button_link: banner.button_link ?? '',
+      secondary_button_text: banner.secondary_button_text ?? '',
+      secondary_button_link: banner.secondary_button_link ?? '',
       show_buttons: banner.show_buttons !== false,
       hide_overlay: banner.hide_overlay ?? (!banner.title && !banner.subtitle && banner.show_buttons === false),
       sort_order: banner.sort_order || 1,
@@ -1715,10 +1715,10 @@ export default function Admin() {
         title: editBannerForm.hide_overlay ? undefined : editBannerForm.title.trim() || undefined,
         subtitle: editBannerForm.hide_overlay ? undefined : editBannerForm.subtitle.trim() || undefined,
         badge_text: editBannerForm.hide_overlay ? undefined : editBannerForm.badge_text.trim() || undefined,
-        button_text: editBannerForm.button_text.trim() || 'Shop Now',
-        button_link: editBannerForm.button_link.trim() || '/products',
-        secondary_button_text: editBannerForm.secondary_button_text.trim() || 'Our Story',
-        secondary_button_link: editBannerForm.secondary_button_link.trim() || '/about',
+        button_text: editBannerForm.hide_overlay ? '' : (editBannerForm.button_text.trim() || 'Shop Now'),
+        button_link: editBannerForm.hide_overlay ? (editBannerForm.button_link === '/products' ? '' : editBannerForm.button_link.trim()) : editBannerForm.button_link.trim(),
+        secondary_button_text: editBannerForm.hide_overlay ? '' : (editBannerForm.secondary_button_text.trim() || 'Our Story'),
+        secondary_button_link: editBannerForm.hide_overlay ? '' : editBannerForm.secondary_button_link.trim(),
         show_buttons: !editBannerForm.hide_overlay && editBannerForm.show_buttons !== false,
         hide_overlay: editBannerForm.hide_overlay,
         sort_order: Number(editBannerForm.sort_order) || 1,
@@ -3105,10 +3105,14 @@ export default function Admin() {
                           )}
 
                           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                            {b.button_link && (
+                            {b.button_link ? (
                               <span className="flex items-center gap-1 font-mono text-primary truncate max-w-xs">
                                 <ExternalLink className="h-3 w-3 shrink-0" />
                                 {b.button_link}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground/70 italic">
+                                No Link (Display Only)
                               </span>
                             )}
                             {b.badge_text && (

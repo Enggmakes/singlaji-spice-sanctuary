@@ -37,6 +37,7 @@ export default function BannerLinkSelector({
 }: BannerLinkSelectorProps) {
   // Build dynamic standard pages
   const standardPages: BannerLinkOption[] = [
+    { label: 'None (No Link / Display Only)', value: '', suggestedButtonText: '', group: 'pages' },
     { label: 'All Products (Catalog)', value: '/products', suggestedButtonText: 'Shop Now', group: 'pages' },
     { label: 'Our Story / About Singlaji', value: '/about', suggestedButtonText: 'Our Story', group: 'pages' },
     { label: 'Shopping Cart', value: '/cart', suggestedButtonText: 'View Cart', group: 'pages' },
@@ -70,10 +71,10 @@ export default function BannerLinkSelector({
 
   // Determine current mode: matching preset or custom
   const matchedPreset = allPresetOptions.find((opt) => opt.value === value);
-  const isCustom = !matchedPreset && value !== '';
+  const isCustom = !matchedPreset && value !== '' && value !== undefined;
 
   const [selectedDropdownValue, setSelectedDropdownValue] = useState<string>(
-    matchedPreset ? matchedPreset.value : value ? '__custom__' : '/products'
+    isCleanPoster ? '__clean_ad_poster__' : matchedPreset ? matchedPreset.value : value === '' ? '' : value ? '__custom__' : ''
   );
   const [customInputValue, setCustomInputValue] = useState<string>(isCustom ? value : '');
 
@@ -86,6 +87,8 @@ export default function BannerLinkSelector({
     const match = allPresetOptions.find((opt) => opt.value === value);
     if (match) {
       setSelectedDropdownValue(match.value);
+    } else if (value === '') {
+      setSelectedDropdownValue('');
     } else if (value) {
       setSelectedDropdownValue('__custom__');
       setCustomInputValue(value);
@@ -102,7 +105,7 @@ export default function BannerLinkSelector({
       } else if (onSelectCleanGraphic) {
         onSelectCleanGraphic();
       }
-      onChange('/products', '');
+      onChange('', '');
     } else {
       if (onCleanPosterToggle) {
         onCleanPosterToggle(false);
@@ -110,6 +113,8 @@ export default function BannerLinkSelector({
       if (selected === '__custom__') {
         const customVal = customInputValue || '/';
         onChange(customVal, defaultSuggestedText || 'Explore');
+      } else if (selected === '') {
+        onChange('', '');
       } else {
         const match = allPresetOptions.find((opt) => opt.value === selected);
         if (match) {

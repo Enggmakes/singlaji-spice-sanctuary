@@ -122,7 +122,7 @@ export default function HeroBannerSlider() {
   const hasText = !isCleanGraphicMode && Boolean(currentBanner.title?.trim() || currentBanner.subtitle?.trim() || currentBanner.badge_text?.trim());
   const hasOverlay = !isCleanGraphicMode && (hasText || showButtons);
   const primaryBtnText = currentBanner.button_text || 'Shop Now';
-  const primaryBtnLink = currentBanner.button_link || '/products';
+  const primaryBtnLink = isCleanGraphicMode ? (currentBanner.button_link || '') : (currentBanner.button_link || '/products');
   const secondaryBtnText = currentBanner.secondary_button_text || 'Our Story';
   const secondaryBtnLink = currentBanner.secondary_button_link || '/about';
 
