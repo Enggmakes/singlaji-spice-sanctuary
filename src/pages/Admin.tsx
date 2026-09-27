@@ -58,6 +58,7 @@ import {
   updateHeroBanner,
   deleteHeroBanner,
   toggleHeroBannerActive,
+  reorderHeroBanners,
   validate16by9Ratio,
 } from '@/lib/bannerService';
 import { compressImage } from '@/lib/imageCompressor';
@@ -561,6 +562,7 @@ export default function Admin() {
     button_link: string;
     secondary_button_text: string;
     secondary_button_link: string;
+    show_buttons: boolean;
     sort_order: number;
     is_active: boolean;
   }>({
@@ -569,8 +571,9 @@ export default function Admin() {
     badge_text: '',
     button_text: 'Shop Now',
     button_link: '/products',
-    secondary_button_text: '',
-    secondary_button_link: '',
+    secondary_button_text: 'Our Story',
+    secondary_button_link: '/about',
+    show_buttons: true,
     sort_order: 1,
     is_active: true,
   });
@@ -642,16 +645,51 @@ export default function Admin() {
     variants: [],
   });
 
+  // Banner Editing State
+  const [editingBanner, setEditingBanner] = useState<HeroBanner | null>(null);
+  const [savingBannerEdit, setSavingBannerEdit] = useState(false);
+  const [editBannerForm, setEditBannerForm] = useState<{
+    id: string;
+    title: string;
+    subtitle: string;
+    badge_text: string;
+    button_text: string;
+    button_link: string;
+    secondary_button_text: string;
+    secondary_button_link: string;
+    show_buttons: boolean;
+    sort_order: number;
+    is_active: boolean;
+    current_image_url: string;
+    new_image_file: File | null;
+    new_image_preview: string | null;
+  }>({
+    id: '',
+    title: '',
+    subtitle: '',
+    badge_text: '',
+    button_text: 'Shop Now',
+    button_link: '/products',
+    secondary_button_text: 'Our Story',
+    secondary_button_link: '/about',
+    show_buttons: true,
+    sort_order: 1,
+    is_active: true,
+    current_image_url: '',
+    new_image_file: null,
+    new_image_preview: null,
+  });
+
   // Lock body scroll and guarantee full screen coverage when modal popup is open
   useEffect(() => {
-    if (editingProduct || previewOrder) {
+    if (editingProduct || previewOrder || editingBanner) {
       const prevOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       return () => {
         document.body.style.overflow = prevOverflow;
       };
     }
-  }, [editingProduct, previewOrder]);
+  }, [editingProduct, previewOrder, editingBanner]);
 
   const [couponForm, setCouponForm] = useState<{
     code: string;
@@ -1486,10 +1524,11 @@ export default function Admin() {
         title: bannerForm.title.trim() || undefined,
         subtitle: bannerForm.subtitle.trim() || undefined,
         badge_text: bannerForm.badge_text.trim() || undefined,
-        button_text: bannerForm.button_text.trim() || undefined,
-        button_link: bannerForm.button_link.trim() || undefined,
-        secondary_button_text: bannerForm.secondary_button_text.trim() || undefined,
-        secondary_button_link: bannerForm.secondary_button_link.trim() || undefined,
+        button_text: bannerForm.button_text.trim() || 'Shop Now',
+        button_link: bannerForm.button_link.trim() || '/products',
+        secondary_button_text: bannerForm.secondary_button_text.trim() || 'Our Story',
+        secondary_button_link: bannerForm.secondary_button_link.trim() || '/about',
+        show_buttons: bannerForm.show_buttons !== false,
         sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
         is_active: bannerForm.is_active,
         aspect_ratio: '16:9',
@@ -1499,15 +1538,16 @@ export default function Admin() {
 
       toast.success('16:9 Hero Banner Added Successfully!');
 
-      // Reset form
+      // Reset form with default buttons
       setBannerForm({
         title: '',
         subtitle: '',
         badge_text: '',
         button_text: 'Shop Now',
         button_link: '/products',
-        secondary_button_text: '',
-        secondary_button_link: '',
+        secondary_button_text: 'Our Story',
+        secondary_button_link: '/about',
+        show_buttons: true,
         sort_order: banners.length + 2,
         is_active: true,
       });
@@ -1558,19 +1598,126 @@ export default function Admin() {
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= banners.length) return;
 
-    const currentBanner = banners[idx];
-    const targetBanner = banners[targetIdx];
+    // Swap items in array
+    const newBanners = [...banners];
+    const temp = newBanners[idx];
+    newBanners[idx] = newBanners[targetIdx];
+    newBanners[targetIdx] = temp;
 
-    const currentOrder = currentBanner.sort_order;
-    const targetOrder = targetBanner.sort_order;
+    // Immediately update state so UI changes with 0 delay
+    setBanners(newBanners);
 
     try {
-      await updateHeroBanner(currentBanner.id, { sort_order: targetOrder });
-      await updateHeroBanner(targetBanner.id, { sort_order: currentOrder });
+      const updated = await reorderHeroBanners(newBanners);
+      setBanners(updated);
+      toast.success('Banner order updated!');
+      broadcastStoreUpdate('hero_banners_changed');
+    } catch (err) {
+      console.error('Failed to reorder banners:', err);
+      toast.error('Failed to reorder banners');
+      await loadBanners();
+    }
+  };
+
+  const handleStartEditBanner = (banner: HeroBanner) => {
+    setEditingBanner(banner);
+    setEditBannerForm({
+      id: banner.id,
+      title: banner.title || '',
+      subtitle: banner.subtitle || '',
+      badge_text: banner.badge_text || '',
+      button_text: banner.button_text || 'Shop Now',
+      button_link: banner.button_link || '/products',
+      secondary_button_text: banner.secondary_button_text || 'Our Story',
+      secondary_button_link: banner.secondary_button_link || '/about',
+      show_buttons: banner.show_buttons !== false,
+      sort_order: banner.sort_order || 1,
+      is_active: banner.is_active,
+      current_image_url: banner.image_url,
+      new_image_file: null,
+      new_image_preview: null,
+    });
+  };
+
+  const handleEditBannerImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const result = await validate16by9Ratio(file);
+    if (!result.isValid) {
+      e.target.value = '';
+      toast.error('Image Rejected: Mandatory 16:9 Ratio Required!', {
+        description: result.error,
+        duration: 6000,
+      });
+      return;
+    }
+
+    setEditBannerForm((prev) => ({
+      ...prev,
+      new_image_file: file,
+      new_image_preview: URL.createObjectURL(file),
+    }));
+    toast.success('16:9 Aspect Ratio Verified!');
+  };
+
+  const handleSaveBannerEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBanner) return;
+
+    setSavingBannerEdit(true);
+    try {
+      let finalImageUrl = editBannerForm.current_image_url;
+
+      if (editBannerForm.new_image_file) {
+        const cleanFileName = `banner-${Date.now()}-${editBannerForm.new_image_file.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(`banners/${cleanFileName}`, editBannerForm.new_image_file, { upsert: true });
+
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(`banners/${cleanFileName}`);
+            finalImageUrl = publicUrl;
+          }
+        } catch (uploadErr) {
+          console.warn('Storage upload fallback:', uploadErr);
+        }
+
+        if (finalImageUrl === editBannerForm.current_image_url) {
+          finalImageUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(editBannerForm.new_image_file!);
+          });
+        }
+      }
+
+      await updateHeroBanner(editingBanner.id, {
+        image_url: finalImageUrl,
+        title: editBannerForm.title.trim() || undefined,
+        subtitle: editBannerForm.subtitle.trim() || undefined,
+        badge_text: editBannerForm.badge_text.trim() || undefined,
+        button_text: editBannerForm.button_text.trim() || 'Shop Now',
+        button_link: editBannerForm.button_link.trim() || '/products',
+        secondary_button_text: editBannerForm.secondary_button_text.trim() || 'Our Story',
+        secondary_button_link: editBannerForm.secondary_button_link.trim() || '/about',
+        show_buttons: editBannerForm.show_buttons !== false,
+        sort_order: Number(editBannerForm.sort_order) || 1,
+        is_active: editBannerForm.is_active,
+      });
+
+      toast.success('Hero banner updated successfully!');
+      setEditingBanner(null);
       await loadBanners();
       broadcastStoreUpdate('hero_banners_changed');
-    } catch {
-      toast.error('Failed to reorder banners');
+    } catch (err: any) {
+      console.error('Failed to update banner:', err);
+      toast.error(err.message || 'Failed to update banner');
+    } finally {
+      setSavingBannerEdit(false);
     }
   };
 
@@ -2637,35 +2784,36 @@ export default function Admin() {
                               alt="16:9 Banner Preview"
                               className="w-full h-full object-cover"
                             />
-                            {/* Overlay simulator if text is entered */}
-                            {(bannerForm.title || bannerForm.subtitle || bannerForm.badge_text) && (
-                              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left">
-                                <div className="max-w-xs space-y-1.5">
-                                  {bannerForm.badge_text && (
-                                    <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
-                                      {bannerForm.badge_text}
+                            {/* Overlay simulator with buttons */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left pointer-events-none">
+                              <div className="max-w-xs space-y-1.5">
+                                {bannerForm.badge_text && (
+                                  <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
+                                    {bannerForm.badge_text}
+                                  </span>
+                                )}
+                                {bannerForm.title && (
+                                  <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight">
+                                    {bannerForm.title}
+                                  </h4>
+                                )}
+                                {bannerForm.subtitle && (
+                                  <p className="text-[10px] text-white/80 line-clamp-2 leading-relaxed">
+                                    {bannerForm.subtitle}
+                                  </p>
+                                )}
+                                {bannerForm.show_buttons && (
+                                  <div className="flex items-center gap-1.5 pt-1">
+                                    <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
+                                      {bannerForm.button_text || 'Shop Now'} →
                                     </span>
-                                  )}
-                                  {bannerForm.title && (
-                                    <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight">
-                                      {bannerForm.title}
-                                    </h4>
-                                  )}
-                                  {bannerForm.subtitle && (
-                                    <p className="text-[10px] text-white/80 line-clamp-2 leading-relaxed">
-                                      {bannerForm.subtitle}
-                                    </p>
-                                  )}
-                                  {bannerForm.button_text && (
-                                    <div className="pt-1">
-                                      <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
-                                        {bannerForm.button_text} →
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                                    <span className="inline-block px-2 py-1 bg-white/15 border border-white/30 text-white text-[10px] font-medium rounded-md shadow-sm">
+                                      {bannerForm.secondary_button_text || 'Our Story'}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
                               16:9 • {bannerValidationState.width}×{bannerValidationState.height}
                             </div>
@@ -2692,7 +2840,7 @@ export default function Admin() {
                     </Label>
                     <Input
                       id="banner-badge"
-                      placeholder="e.g. Festival Special, 100% Pure"
+                      placeholder="e.g. Premium Indian Spices"
                       value={bannerForm.badge_text}
                       onChange={(e) => setBannerForm({ ...bannerForm, badge_text: e.target.value })}
                       className="text-xs mt-1"
@@ -2705,7 +2853,7 @@ export default function Admin() {
                     </Label>
                     <Input
                       id="banner-title"
-                      placeholder="e.g. Authentic Stone-Ground Masalas"
+                      placeholder="e.g. Authentic Flavors, Straight from India"
                       value={bannerForm.title}
                       onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
                       className="text-xs mt-1"
@@ -2718,7 +2866,7 @@ export default function Admin() {
                     </Label>
                     <Input
                       id="banner-subtitle"
-                      placeholder="e.g. Experience the rich flavors of Indian cuisine"
+                      placeholder="e.g. Experience the rich heritage of Indian cuisine"
                       value={bannerForm.subtitle}
                       onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
                       className="text-xs mt-1"
@@ -2726,8 +2874,8 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <Label htmlFor="banner-btn-text" className="text-xs">
-                      Button Text (Optional)
+                    <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
+                      Primary Button Text
                     </Label>
                     <Input
                       id="banner-btn-text"
@@ -2740,18 +2888,41 @@ export default function Admin() {
 
                   <div>
                     <Label htmlFor="banner-btn-link" className="text-xs font-semibold text-primary">
-                      Click / Target Link (Recommended)
+                      Primary Button Link
                     </Label>
                     <Input
                       id="banner-btn-link"
-                      placeholder="e.g. /products or /product/garam-masala"
+                      placeholder="/products"
                       value={bannerForm.button_link}
                       onChange={(e) => setBannerForm({ ...bannerForm, button_link: e.target.value })}
                       className="text-xs mt-1"
                     />
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      Clicking banner or button redirects customers here.
-                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-sec-btn-text" className="text-xs">
+                      Secondary Button Text
+                    </Label>
+                    <Input
+                      id="banner-sec-btn-text"
+                      placeholder="Our Story"
+                      value={bannerForm.secondary_button_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-sec-btn-link" className="text-xs">
+                      Secondary Button Link
+                    </Label>
+                    <Input
+                      id="banner-sec-btn-link"
+                      placeholder="/about"
+                      value={bannerForm.secondary_button_link}
+                      onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_link: e.target.value })}
+                      className="text-xs mt-1"
+                    />
                   </div>
 
                   <div>
@@ -2772,17 +2943,31 @@ export default function Admin() {
 
                 {/* Submit Actions */}
                 <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={bannerForm.is_active}
-                      onChange={(e) => setBannerForm({ ...bannerForm, is_active: e.target.checked })}
-                      className="rounded border-border text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="text-xs font-medium text-foreground">
-                      Make Banner Active Immediately on Storefront
-                    </span>
-                  </label>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={bannerForm.show_buttons}
+                        onChange={(e) => setBannerForm({ ...bannerForm, show_buttons: e.target.checked })}
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-xs font-semibold text-foreground">
+                        Show "Shop Now" & "Our Story" Buttons on Slide
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={bannerForm.is_active}
+                        onChange={(e) => setBannerForm({ ...bannerForm, is_active: e.target.checked })}
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-xs font-medium text-foreground">
+                        Active Immediately
+                      </span>
+                    </label>
+                  </div>
 
                   <Button
                     type="submit"
@@ -2923,6 +3108,18 @@ export default function Admin() {
                             <ArrowDown className="h-3.5 w-3.5" />
                           </button>
                         </div>
+
+                        {/* Edit Button */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStartEditBanner(b)}
+                          className="text-xs h-8 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                          title="Edit Banner Content & Image"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
 
                         {/* Active Toggle Button */}
                         <Button
@@ -3422,6 +3619,263 @@ export default function Admin() {
           </div>,
           document.body
         )}
+
+        {/* ============================================================== */}
+        {/* EDIT HERO BANNER MODAL (STRICT 16:9 VALIDATION) */}
+        {/* ============================================================== */}
+        {editingBanner &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[9999] w-screen h-screen min-h-[100dvh] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !savingBannerEdit) setEditingBanner(null);
+              }}
+            >
+              <div
+                className="bg-card w-full max-w-xl rounded-2xl border border-border shadow-2xl overflow-hidden max-h-[92vh] flex flex-col my-auto relative z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="p-5 border-b border-border bg-muted/30 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                      <Sliders className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif font-bold text-lg text-foreground">
+                        Edit Hero Banner
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Modify banner content, CTA buttons, sequence, or replace 16:9 image
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setEditingBanner(null)}
+                    disabled={savingBannerEdit}
+                    className="h-8 w-8 rounded-full hover:bg-muted"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Modal Body */}
+                <form onSubmit={handleSaveBannerEdit} className="p-6 overflow-y-auto space-y-5">
+                  {/* 16:9 Image Preview & Replacement */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                      <span>16:9 Banner Image</span>
+                      <span className="text-[10px] text-primary font-mono">Strict 16:9 Required</span>
+                    </Label>
+                    <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden border border-border bg-stone-900 shadow-inner group">
+                      <img
+                        src={editBannerForm.new_image_preview || editBannerForm.current_image_url}
+                        alt="Banner Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end p-3.5">
+                        <label
+                          htmlFor="edit-hero-banner-image"
+                          className="cursor-pointer px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 text-white text-xs font-medium backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all shadow-md"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          {editBannerForm.new_image_file ? 'Change Selected Image' : 'Replace Image (16:9 Only)'}
+                        </label>
+                        <input
+                          id="edit-hero-banner-image"
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleEditBannerImageSelect}
+                          className="hidden"
+                        />
+                      </div>
+                    </div>
+                    {editBannerForm.new_image_file && (
+                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        New 16:9 Image selected: {editBannerForm.new_image_file.name}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text Overlays */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-banner-badge" className="text-xs">
+                        Badge / Tag (Optional)
+                      </Label>
+                      <Input
+                        id="edit-banner-badge"
+                        placeholder="e.g. Premium Indian Spices"
+                        value={editBannerForm.badge_text}
+                        onChange={(e) =>
+                          setEditBannerForm({ ...editBannerForm, badge_text: e.target.value })
+                        }
+                        className="text-xs mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="edit-banner-order" className="text-xs">
+                        Display Order Number
+                      </Label>
+                      <Input
+                        id="edit-banner-order"
+                        type="number"
+                        min="1"
+                        value={editBannerForm.sort_order}
+                        onChange={(e) =>
+                          setEditBannerForm({
+                            ...editBannerForm,
+                            sort_order: parseInt(e.target.value) || 1,
+                          })
+                        }
+                        className="text-xs mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-banner-title" className="text-xs">
+                      Banner Heading / Title (Optional)
+                    </Label>
+                    <Input
+                      id="edit-banner-title"
+                      placeholder="e.g. Authentic Flavors, Straight from India"
+                      value={editBannerForm.title}
+                      onChange={(e) =>
+                        setEditBannerForm({ ...editBannerForm, title: e.target.value })
+                      }
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-banner-subtitle" className="text-xs">
+                      Subtitle / Caption (Optional)
+                    </Label>
+                    <Input
+                      id="edit-banner-subtitle"
+                      placeholder="e.g. Experience the rich heritage of Indian cuisine"
+                      value={editBannerForm.subtitle}
+                      onChange={(e) =>
+                        setEditBannerForm({ ...editBannerForm, subtitle: e.target.value })
+                      }
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  {/* Button Controls */}
+                  <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={editBannerForm.show_buttons}
+                        onChange={(e) =>
+                          setEditBannerForm({ ...editBannerForm, show_buttons: e.target.checked })
+                        }
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-xs font-semibold text-foreground">
+                        Show "Shop Now" & "Our Story" Buttons on Slide
+                      </span>
+                    </label>
+
+                    {editBannerForm.show_buttons && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Primary Button Text</Label>
+                          <Input
+                            value={editBannerForm.button_text}
+                            onChange={(e) =>
+                              setEditBannerForm({ ...editBannerForm, button_text: e.target.value })
+                            }
+                            className="text-xs mt-0.5"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Primary Button Link</Label>
+                          <Input
+                            value={editBannerForm.button_link}
+                            onChange={(e) =>
+                              setEditBannerForm({ ...editBannerForm, button_link: e.target.value })
+                            }
+                            className="text-xs mt-0.5"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Secondary Button Text</Label>
+                          <Input
+                            value={editBannerForm.secondary_button_text}
+                            onChange={(e) =>
+                              setEditBannerForm({
+                                ...editBannerForm,
+                                secondary_button_text: e.target.value,
+                              })
+                            }
+                            className="text-xs mt-0.5"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-muted-foreground">Secondary Button Link</Label>
+                          <Input
+                            value={editBannerForm.secondary_button_link}
+                            onChange={(e) =>
+                              setEditBannerForm({
+                                ...editBannerForm,
+                                secondary_button_link: e.target.value,
+                              })
+                            }
+                            className="text-xs mt-0.5"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Active Toggle */}
+                  <div className="pt-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={editBannerForm.is_active}
+                        onChange={(e) =>
+                          setEditBannerForm({ ...editBannerForm, is_active: e.target.checked })
+                        }
+                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-xs font-medium text-foreground">
+                        Active on Storefront Homepage
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Modal Footer / Actions */}
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEditingBanner(null)}
+                      disabled={savingBannerEdit}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={savingBannerEdit}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      {savingBannerEdit ? 'Saving Changes...' : 'Save Banner Changes'}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>,
+            document.body
+          )}
 
         {/* Amazon-Standard Shipping Label Modal */}
         <ShippingLabelModal

@@ -121,7 +121,7 @@ export function getLocalBanners(): HeroBanner[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      return [...parsed].sort((a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     }
     return DEFAULT_BANNERS;
   } catch {
@@ -134,10 +134,38 @@ export function getLocalBanners(): HeroBanner[] {
  */
 export function setLocalBanners(banners: HeroBanner[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(banners));
+    const sorted = [...banners].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted));
   } catch (err) {
     console.warn('Failed to save banners to localStorage:', err);
   }
+}
+
+/**
+ * Reorder banners by providing the newly ordered array
+ */
+export async function reorderHeroBanners(orderedBanners: HeroBanner[]): Promise<HeroBanner[]> {
+  const withUpdatedOrders = orderedBanners.map((banner, index) => ({
+    ...banner,
+    sort_order: index + 1,
+    updated_at: new Date().toISOString(),
+  }));
+
+  setLocalBanners(withUpdatedOrders);
+
+  try {
+    for (const b of withUpdatedOrders) {
+      await (supabase as any)
+        .from('hero_banners')
+        .update({ sort_order: b.sort_order, updated_at: b.updated_at })
+        .eq('id', b.id);
+    }
+  } catch (err) {
+    console.warn('Supabase reorder fallback:', err);
+  }
+
+  broadcastBannerChange();
+  return withUpdatedOrders;
 }
 
 /**
@@ -151,12 +179,13 @@ export async function fetchHeroBanners(onlyActive = false): Promise<HeroBanner[]
       .order('sort_order', { ascending: true });
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      setLocalBanners(data);
+      const sorted = [...data].sort((a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      setLocalBanners(sorted);
       if (onlyActive) {
-        const activeOnly = data.filter((b: HeroBanner) => b.is_active);
+        const activeOnly = sorted.filter((b: HeroBanner) => b.is_active);
         return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
       }
-      return data;
+      return sorted;
     }
   } catch (err) {
     console.log('Supabase hero_banners table not configured or offline, using local storage fallback:', err);

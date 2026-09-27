@@ -117,8 +117,13 @@ export default function HeroBannerSlider() {
   };
 
   const currentBanner = banners[currentIndex] || banners[0] || DEFAULT_BANNERS[0];
-  const hasTextOverlay = Boolean(currentBanner.title || currentBanner.subtitle || currentBanner.badge_text);
-  const clickUrl = currentBanner.button_link || (!hasTextOverlay ? currentBanner.button_link : undefined);
+  const showButtons = currentBanner.show_buttons !== false;
+  const hasText = Boolean(currentBanner.title || currentBanner.subtitle || currentBanner.badge_text);
+  const hasOverlay = hasText || showButtons;
+  const primaryBtnText = currentBanner.button_text || 'Shop Now';
+  const primaryBtnLink = currentBanner.button_link || '/products';
+  const secondaryBtnText = currentBanner.secondary_button_text || 'Our Story';
+  const secondaryBtnLink = currentBanner.secondary_button_link || '/about';
 
   // Slide animation variants
   const slideVariants = {
@@ -169,26 +174,25 @@ export default function HeroBannerSlider() {
               loading="eager"
             />
 
-            {/* Gradient Overlay for text contrast when text overlay is present */}
-            {hasTextOverlay ? (
-              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 sm:via-black/45 to-transparent" />
+            {/* Gradient Overlay for high-contrast readability on any image */}
+            {hasOverlay ? (
+              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 sm:via-black/35 to-transparent pointer-events-none" />
             ) : (
-              // Subtle gradient at bottom for indicator dots visibility
               <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
             )}
 
-            {/* Direct banner link wrapper if banner is purely graphic with no text */}
-            {!hasTextOverlay && currentBanner.button_link && (
+            {/* Direct banner background link if buttons are disabled */}
+            {!showButtons && primaryBtnLink && (
               <Link
-                to={currentBanner.button_link}
+                to={primaryBtnLink}
                 className="absolute inset-0 z-10 cursor-pointer"
                 aria-label={currentBanner.title || 'View Promotion'}
               />
             )}
           </div>
 
-          {/* Optional Content Overlay */}
-          {hasTextOverlay && (
+          {/* Interactive Content & Action Buttons Overlay */}
+          {hasOverlay && (
             <div className="absolute inset-0 flex items-center z-10 pointer-events-none">
               <div className="container mx-auto px-4 sm:px-6 md:px-12">
                 <motion.div
@@ -218,35 +222,33 @@ export default function HeroBannerSlider() {
                     </p>
                   )}
 
-                  {/* Call to Action Buttons */}
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 pt-1 sm:pt-2">
-                    {currentBanner.button_link && (
+                  {/* Call to Action Buttons (Shop Now & Our Story like previous slide) */}
+                  {showButtons && (
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 pt-1 sm:pt-2">
                       <Button
                         asChild
                         variant="hero"
                         size="sm"
                         className="sm:h-11 sm:px-6 sm:text-base text-xs h-8 px-3.5 shadow-lg shadow-black/20"
                       >
-                        <Link to={currentBanner.button_link}>
-                          {currentBanner.button_text || 'Shop Now'}
+                        <Link to={primaryBtnLink}>
+                          {primaryBtnText}
                           <ArrowRight className="ml-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Link>
                       </Button>
-                    )}
 
-                    {currentBanner.secondary_button_link && (
                       <Button
                         asChild
                         variant="outline"
                         size="sm"
                         className="sm:h-11 sm:px-6 sm:text-base text-xs h-8 px-3.5 bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm shadow-sm"
                       >
-                        <Link to={currentBanner.secondary_button_link}>
-                          {currentBanner.secondary_button_text || 'Learn More'}
+                        <Link to={secondaryBtnLink}>
+                          {secondaryBtnText}
                         </Link>
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </motion.div>
               </div>
             </div>
