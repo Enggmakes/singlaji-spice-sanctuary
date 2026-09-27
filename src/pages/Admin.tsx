@@ -27,6 +27,12 @@ import {
   Calculator,
   Printer,
   Send,
+  Sliders,
+  Image as ImageIcon,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { createAndAssignShipment, ShipmentDetails } from '@/lib/shiprocket';
@@ -39,12 +45,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Coupon } from '@/types/coupon';
+import { HeroBanner } from '@/types/banner';
 import {
   fetchCoupons,
   createCoupon,
   toggleCouponActive,
   deleteCoupon,
 } from '@/lib/couponService';
+import {
+  fetchHeroBanners,
+  createHeroBanner,
+  updateHeroBanner,
+  deleteHeroBanner,
+  toggleHeroBannerActive,
+  validate16by9Ratio,
+} from '@/lib/bannerService';
 import { compressImage } from '@/lib/imageCompressor';
 import {
   parseWeightVariants,
@@ -524,15 +539,51 @@ export default function Admin() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'coupons'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'coupons' | 'banners'>('orders');
 
   // Categories & Products state
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [banners, setBanners] = useState<HeroBanner[]>([]);
   const [addingProduct, setAddingProduct] = useState(false);
   const [addingCoupon, setAddingCoupon] = useState(false);
+  const [addingBanner, setAddingBanner] = useState(false);
+  const [loadingBanners, setLoadingBanners] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Hero Banner Form State (Strict 16:9 Ratio Required)
+  const [bannerForm, setBannerForm] = useState<{
+    title: string;
+    subtitle: string;
+    badge_text: string;
+    button_text: string;
+    button_link: string;
+    secondary_button_text: string;
+    secondary_button_link: string;
+    sort_order: number;
+    is_active: boolean;
+  }>({
+    title: '',
+    subtitle: '',
+    badge_text: '',
+    button_text: 'Shop Now',
+    button_link: '/products',
+    secondary_button_text: '',
+    secondary_button_link: '',
+    sort_order: 1,
+    is_active: true,
+  });
+
+  const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
+  const [bannerImagePreview, setBannerImagePreview] = useState<string | null>(null);
+  const [bannerValidationState, setBannerValidationState] = useState<{
+    isValid: boolean;
+    width?: number;
+    height?: number;
+    ratio?: number;
+    error?: string;
+  }>({ isValid: false });
 
   // Orders state
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -646,6 +697,7 @@ export default function Admin() {
     fetchCategories();
     fetchProducts();
     loadCoupons();
+    loadBanners();
     fetchOrders();
 
     // SUPABASE REALTIME SUBSCRIPTION FOR LIVE ORDERS, PRODUCTS & CATEGORIES
@@ -679,11 +731,21 @@ export default function Admin() {
           fetchCategories();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'hero_banners' },
+        () => {
+          loadBanners();
+        }
+      )
       .on('broadcast', { event: 'product_changed' }, () => {
         fetchProducts();
       })
       .on('broadcast', { event: 'category_changed' }, () => {
         fetchCategories();
+      })
+      .on('broadcast', { event: 'hero_banners_changed' }, () => {
+        loadBanners();
       })
       .subscribe();
 
@@ -693,7 +755,9 @@ export default function Admin() {
   }, [isAdmin]);
 
   // Instant broadcast helper to notify all customer browsers and devices immediately
-  const broadcastStoreUpdate = (event: 'product_changed' | 'category_changed' | 'coupon_changed') => {
+  const broadcastStoreUpdate = (
+    event: 'product_changed' | 'category_changed' | 'coupon_changed' | 'hero_banners_changed'
+  ) => {
     try {
       const ch = supabase.channel('store_fast_broadcast');
       ch.send({
@@ -1313,6 +1377,203 @@ export default function Admin() {
     }
   };
 
+  // =========================================================================
+  // HERO BANNERS MANAGEMENT HANDLERS (STRICT 16:9 RATIO ENFORCEMENT)
+  // =========================================================================
+  const loadBanners = async () => {
+    setLoadingBanners(true);
+    try {
+      const data = await fetchHeroBanners(false);
+      setBanners(data);
+    } catch (err) {
+      console.error('Failed to load hero banners:', err);
+    } finally {
+      setLoadingBanners(false);
+    }
+  };
+
+  const handleBannerImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Strict 16:9 ratio validation
+    const result = await validate16by9Ratio(file);
+
+    if (!result.isValid) {
+      // Clear file input immediately
+      e.target.value = '';
+      setBannerImageFile(null);
+      setBannerImagePreview(null);
+      setBannerValidationState({
+        isValid: false,
+        width: result.width,
+        height: result.height,
+        ratio: result.ratio,
+        error: result.error,
+      });
+
+      toast.error('Image Rejected: Mandatory 16:9 Ratio Required!', {
+        description:
+          result.error ||
+          'Only 16:9 aspect ratio images are allowed (e.g. 1920×1080, 1600×900, 1280×720). Other sizes are strictly prohibited.',
+        duration: 7000,
+      });
+      return;
+    }
+
+    // Success: Verified 16:9 ratio
+    setBannerValidationState({
+      isValid: true,
+      width: result.width,
+      height: result.height,
+      ratio: result.ratio,
+    });
+    setBannerImageFile(file);
+    setBannerImagePreview(URL.createObjectURL(file));
+
+    toast.success('16:9 Aspect Ratio Verified!', {
+      description: `Widescreen Resolution: ${result.width} × ${result.height} (${(result.ratio).toFixed(2)}:1)`,
+    });
+  };
+
+  const handleCreateBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!bannerImageFile) {
+      toast.error('Please upload a 16:9 banner image');
+      return;
+    }
+
+    if (!bannerValidationState.isValid) {
+      toast.error('Cannot save: 16:9 aspect ratio is mandatory!');
+      return;
+    }
+
+    setAddingBanner(true);
+    try {
+      const cleanFileName = `banner-${Date.now()}-${bannerImageFile.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+      let finalImageUrl = '';
+
+      // Upload image to Supabase storage 'product-images' inside 'banners/' folder
+      try {
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(`banners/${cleanFileName}`, bannerImageFile, { upsert: true });
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(`banners/${cleanFileName}`);
+          finalImageUrl = publicUrl;
+        } else {
+          console.warn('Storage upload error, using local fallback:', uploadError);
+        }
+      } catch (uploadErr) {
+        console.warn('Storage upload exception, using local fallback:', uploadErr);
+      }
+
+      // If storage bucket was unavailable or gave an error, fallback to data URL so the admin is never stuck
+      if (!finalImageUrl) {
+        finalImageUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(bannerImageFile);
+        });
+      }
+
+      await createHeroBanner({
+        image_url: finalImageUrl,
+        title: bannerForm.title.trim() || undefined,
+        subtitle: bannerForm.subtitle.trim() || undefined,
+        badge_text: bannerForm.badge_text.trim() || undefined,
+        button_text: bannerForm.button_text.trim() || undefined,
+        button_link: bannerForm.button_link.trim() || undefined,
+        secondary_button_text: bannerForm.secondary_button_text.trim() || undefined,
+        secondary_button_link: bannerForm.secondary_button_link.trim() || undefined,
+        sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
+        is_active: bannerForm.is_active,
+        aspect_ratio: '16:9',
+        width: bannerValidationState.width,
+        height: bannerValidationState.height,
+      });
+
+      toast.success('16:9 Hero Banner Added Successfully!');
+
+      // Reset form
+      setBannerForm({
+        title: '',
+        subtitle: '',
+        badge_text: '',
+        button_text: 'Shop Now',
+        button_link: '/products',
+        secondary_button_text: '',
+        secondary_button_link: '',
+        sort_order: banners.length + 2,
+        is_active: true,
+      });
+      setBannerImageFile(null);
+      setBannerImagePreview(null);
+      setBannerValidationState({ isValid: false });
+
+      // Reset file input element
+      const fileInput = document.getElementById('hero-banner-image-input') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+      await loadBanners();
+      broadcastStoreUpdate('hero_banners_changed');
+    } catch (err: any) {
+      console.error('Failed to create hero banner:', err);
+      toast.error(err.message || 'Failed to create hero banner');
+    } finally {
+      setAddingBanner(false);
+    }
+  };
+
+  const handleToggleBanner = async (id: string, currentStatus: boolean) => {
+    try {
+      await toggleHeroBannerActive(id, currentStatus);
+      toast.success(`Banner ${!currentStatus ? 'activated' : 'deactivated'}`);
+      await loadBanners();
+      broadcastStoreUpdate('hero_banners_changed');
+    } catch (err) {
+      toast.error('Failed to toggle banner status');
+    }
+  };
+
+  const handleDeleteBanner = async (id: string, title?: string) => {
+    if (!confirm(`Are you sure you want to delete this banner${title ? ` "${title}"` : ''}?`)) return;
+    try {
+      await deleteHeroBanner(id);
+      toast.success('Hero banner deleted successfully');
+      await loadBanners();
+      broadcastStoreUpdate('hero_banners_changed');
+    } catch (err) {
+      toast.error('Failed to delete banner');
+    }
+  };
+
+  const handleMoveBanner = async (id: string, direction: 'up' | 'down') => {
+    const idx = banners.findIndex((b) => b.id === id);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= banners.length) return;
+
+    const currentBanner = banners[idx];
+    const targetBanner = banners[targetIdx];
+
+    const currentOrder = currentBanner.sort_order;
+    const targetOrder = targetBanner.sort_order;
+
+    try {
+      await updateHeroBanner(currentBanner.id, { sort_order: targetOrder });
+      await updateHeroBanner(targetBanner.id, { sort_order: currentOrder });
+      await loadBanners();
+      broadcastStoreUpdate('hero_banners_changed');
+    } catch {
+      toast.error('Failed to reorder banners');
+    }
+  };
+
   if (authLoading) {
     return (
       <Layout>
@@ -1416,6 +1677,18 @@ export default function Admin() {
               }`}
             >
               Categories ({categories.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('banners')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'banners'
+                  ? 'bg-background text-primary shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Sliders className="h-4 w-4" />
+              Hero Banners ({banners.length})
             </button>
           </div>
         </div>
@@ -2239,6 +2512,455 @@ export default function Admin() {
               ))}
             </div>
           </section>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 5: HERO BANNERS (MANDATORY 16:9 RATIO ENFORCEMENT) */}
+        {/* ============================================================== */}
+        {activeTab === 'banners' && (
+          <div className="space-y-8">
+            {/* Header / Intro Card */}
+            <div className="bg-card rounded-2xl p-6 shadow-card border border-border space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold font-serif text-foreground">
+                    Storefront Hero Banners
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Manage multi-banner auto-changing carousel displayed at the top of your homepage.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {banners.filter((b) => b.is_active).length} Active Banners
+                  </span>
+                </div>
+              </div>
+
+              {/* Strict 16:9 Ratio Requirement Guide Box */}
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">
+                    Mandatory 16:9 Aspect Ratio Rule:
+                  </p>
+                  <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                    To maintain pixel-perfect responsive layouts on mobiles, tablets, and desktops, every banner image <strong>MUST strictly follow the 16:9 widescreen ratio</strong> (e.g., <strong>1920×1080</strong>, <strong>1600×900</strong>, or <strong>1280×720</strong>). Any image that does not match 16:9 will be rejected automatically upon file selection.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Add New Banner Form Card */}
+            <div className="bg-card rounded-2xl p-6 shadow-card border border-border space-y-6">
+              <div className="border-b border-border pb-4">
+                <h3 className="text-lg font-bold font-serif text-foreground flex items-center gap-2">
+                  <Plus className="h-5 w-5 text-primary" />
+                  Upload New 16:9 Hero Banner
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Select an image with exact 16:9 dimensions and configure optional text overlays or click redirects.
+                </p>
+              </div>
+
+              <form onSubmit={handleCreateBanner} className="space-y-6">
+                {/* Image Upload Area with Strict 16:9 Checker */}
+                <div className="space-y-3">
+                  <Label htmlFor="hero-banner-image-input" className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-primary" />
+                    Banner Graphic File <span className="text-destructive font-bold">* (Strict 16:9 Ratio Only)</span>
+                  </Label>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* File Drop / Select Area */}
+                    <div className="lg:col-span-6 space-y-3">
+                      <div className="border-2 border-dashed border-border rounded-xl p-5 hover:border-primary/50 transition-colors bg-muted/20 text-center space-y-3">
+                        <input
+                          id="hero-banner-image-input"
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleBannerImageSelect}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="hero-banner-image-input"
+                          className="cursor-pointer inline-flex flex-col items-center justify-center gap-2"
+                        >
+                          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                            <Upload className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-primary hover:underline">
+                              Click to select 16:9 image
+                            </span>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              JPEG, PNG, or WebP • Recommended: 1920 × 1080
+                            </p>
+                          </div>
+                        </label>
+                      </div>
+
+                      {/* Ratio Validation Feedback Messages */}
+                      {bannerValidationState.error && (
+                        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-start gap-2 animate-in fade-in">
+                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Image Upload Rejected</p>
+                            <p className="mt-0.5 leading-relaxed">{bannerValidationState.error}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {bannerValidationState.isValid && bannerValidationState.width && (
+                        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <div>
+                            <span className="font-bold">16:9 Aspect Ratio Verified!</span>
+                            <span className="ml-1.5 opacity-90">
+                              Resolution: {bannerValidationState.width} × {bannerValidationState.height} ({(bannerValidationState.ratio || 0).toFixed(2)}:1)
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live 16:9 Preview Box */}
+                    <div className="lg:col-span-6 space-y-2">
+                      <Label className="text-xs font-semibold text-muted-foreground">
+                        Live 16:9 Storefront Preview
+                      </Label>
+                      <div className="w-full aspect-[16/9] rounded-xl border border-border bg-stone-900 relative overflow-hidden flex items-center justify-center shadow-inner group">
+                        {bannerImagePreview ? (
+                          <>
+                            <img
+                              src={bannerImagePreview}
+                              alt="16:9 Banner Preview"
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Overlay simulator if text is entered */}
+                            {(bannerForm.title || bannerForm.subtitle || bannerForm.badge_text) && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left">
+                                <div className="max-w-xs space-y-1.5">
+                                  {bannerForm.badge_text && (
+                                    <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
+                                      {bannerForm.badge_text}
+                                    </span>
+                                  )}
+                                  {bannerForm.title && (
+                                    <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight">
+                                      {bannerForm.title}
+                                    </h4>
+                                  )}
+                                  {bannerForm.subtitle && (
+                                    <p className="text-[10px] text-white/80 line-clamp-2 leading-relaxed">
+                                      {bannerForm.subtitle}
+                                    </p>
+                                  )}
+                                  {bannerForm.button_text && (
+                                    <div className="pt-1">
+                                      <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
+                                        {bannerForm.button_text} →
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
+                              16:9 • {bannerValidationState.width}×{bannerValidationState.height}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-6 text-muted-foreground space-y-2">
+                            <ImageIcon className="w-8 h-8 mx-auto opacity-40" />
+                            <p className="text-xs">No image selected</p>
+                            <p className="text-[10px] opacity-70">
+                              16:9 preview will appear here once a valid 16:9 file is selected
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Optional Content Overlays & Click URL Configuration */}
+                <div className="pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="banner-badge" className="text-xs">
+                      Badge / Tag (Optional)
+                    </Label>
+                    <Input
+                      id="banner-badge"
+                      placeholder="e.g. Festival Special, 100% Pure"
+                      value={bannerForm.badge_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, badge_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-title" className="text-xs">
+                      Banner Heading / Title (Optional)
+                    </Label>
+                    <Input
+                      id="banner-title"
+                      placeholder="e.g. Authentic Stone-Ground Masalas"
+                      value={bannerForm.title}
+                      onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-subtitle" className="text-xs">
+                      Subtitle / Caption (Optional)
+                    </Label>
+                    <Input
+                      id="banner-subtitle"
+                      placeholder="e.g. Experience the rich flavors of Indian cuisine"
+                      value={bannerForm.subtitle}
+                      onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-btn-text" className="text-xs">
+                      Button Text (Optional)
+                    </Label>
+                    <Input
+                      id="banner-btn-text"
+                      placeholder="Shop Now"
+                      value={bannerForm.button_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-btn-link" className="text-xs font-semibold text-primary">
+                      Click / Target Link (Recommended)
+                    </Label>
+                    <Input
+                      id="banner-btn-link"
+                      placeholder="e.g. /products or /product/garam-masala"
+                      value={bannerForm.button_link}
+                      onChange={(e) => setBannerForm({ ...bannerForm, button_link: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Clicking banner or button redirects customers here.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-order" className="text-xs">
+                      Display Sequence Number
+                    </Label>
+                    <Input
+                      id="banner-order"
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      value={bannerForm.sort_order}
+                      onChange={(e) => setBannerForm({ ...bannerForm, sort_order: parseInt(e.target.value) || 1 })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={bannerForm.is_active}
+                      onChange={(e) => setBannerForm({ ...bannerForm, is_active: e.target.checked })}
+                      className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="text-xs font-medium text-foreground">
+                      Make Banner Active Immediately on Storefront
+                    </span>
+                  </label>
+
+                  <Button
+                    type="submit"
+                    disabled={addingBanner || !bannerImageFile || !bannerValidationState.isValid}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-6 py-2 h-9"
+                  >
+                    {addingBanner ? (
+                      <span className="flex items-center gap-2">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        Saving 16:9 Banner...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add 16:9 Banner
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            {/* Existing Banners Management List */}
+            <div className="bg-card rounded-2xl p-6 shadow-card border border-border space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <div>
+                  <h3 className="text-lg font-bold font-serif text-foreground">
+                    Current Homepage Banners ({banners.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Order of auto-rotation in storefront slider. You can reorder, toggle visibility, or delete anytime.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadBanners}
+                  disabled={loadingBanners}
+                  className="text-xs h-8 gap-1.5"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingBanners ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+
+              {banners.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-xs space-y-2">
+                  <ImageIcon className="w-8 h-8 mx-auto opacity-30" />
+                  <p className="font-semibold">No custom banners added yet</p>
+                  <p className="text-[11px] opacity-75">
+                    Storefront is currently using the default Singlaji hero banner. Add your first 16:9 banner above!
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border space-y-4 pt-2">
+                  {banners.map((b, idx) => (
+                    <div
+                      key={b.id}
+                      className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      {/* Left: 16:9 Thumbnail & Info */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-1 min-w-0">
+                        {/* 16:9 Thumbnail Container */}
+                        <div className="relative aspect-[16/9] w-full sm:w-56 rounded-xl overflow-hidden border border-border bg-stone-900 shrink-0 shadow-sm">
+                          <img
+                            src={b.image_url}
+                            alt={b.title || 'Hero Banner'}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-white font-semibold backdrop-blur-sm">
+                            #{idx + 1}
+                          </div>
+                          <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-emerald-500/80 text-[9px] text-white font-mono font-medium backdrop-blur-sm">
+                            16:9
+                          </div>
+                        </div>
+
+                        {/* Banner Details */}
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-serif font-bold text-sm text-foreground truncate">
+                              {b.title || <span className="text-muted-foreground italic">Graphic Banner (No Text Overlay)</span>}
+                            </h4>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                                b.is_active
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {b.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+
+                          {b.subtitle && (
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {b.subtitle}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                            {b.button_link && (
+                              <span className="flex items-center gap-1 font-mono text-primary truncate max-w-xs">
+                                <ExternalLink className="h-3 w-3 shrink-0" />
+                                {b.button_link}
+                              </span>
+                            )}
+                            {b.badge_text && (
+                              <span className="px-2 py-0.5 rounded bg-muted text-[10px] font-medium">
+                                Tag: {b.badge_text}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        {/* Reorder Arrows */}
+                        <div className="flex items-center border border-border rounded-lg overflow-hidden bg-background">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveBanner(b.id, 'up')}
+                            disabled={idx === 0}
+                            title="Move Up"
+                            className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </button>
+                          <div className="w-[1px] h-4 bg-border" />
+                          <button
+                            type="button"
+                            onClick={() => handleMoveBanner(b.id, 'down')}
+                            disabled={idx === banners.length - 1}
+                            title="Move Down"
+                            className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground transition-colors"
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Active Toggle Button */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleBanner(b.id, b.is_active)}
+                          className="text-xs h-8"
+                        >
+                          {b.is_active ? (
+                            <>
+                              <Ban className="h-3.5 w-3.5 mr-1 text-destructive" />
+                              Hide
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                              Show
+                            </>
+                          )}
+                        </Button>
+
+                        {/* Delete Button */}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteBanner(b.id, b.title)}
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          title="Delete Banner"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
         {/* ============================================================== */}
         {/* IN-PAGE LIVE TRACKER PREVIEW MODAL */}

@@ -59,6 +59,10 @@ export default function RealtimeSync() {
       .on('broadcast', { event: 'coupon_changed' }, () => {
         queryClient.invalidateQueries({ queryKey: ['coupons'] });
       })
+      .on('broadcast', { event: 'hero_banners_changed' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['hero_banners'] });
+        window.dispatchEvent(new Event('hero_banners_updated'));
+      })
       .subscribe();
 
     return () => {
