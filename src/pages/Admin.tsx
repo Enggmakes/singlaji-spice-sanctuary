@@ -2904,6 +2904,11 @@ export default function Admin() {
                           ...prev,
                           hide_overlay: isClean,
                           show_buttons: !isClean,
+                          title: isClean ? '' : prev.title,
+                          subtitle: isClean ? '' : prev.subtitle,
+                          badge_text: isClean ? '' : prev.badge_text,
+                          button_text: isClean ? '' : (prev.button_text || 'Shop Now'),
+                          button_link: isClean ? '' : prev.button_link,
                         }));
                       }}
                       onChange={(url, suggestedText) => {
@@ -3849,6 +3854,11 @@ export default function Admin() {
                                 ...prev,
                                 hide_overlay: isClean,
                                 show_buttons: !isClean,
+                                title: isClean ? '' : prev.title,
+                                subtitle: isClean ? '' : prev.subtitle,
+                                badge_text: isClean ? '' : prev.badge_text,
+                                button_text: isClean ? '' : (prev.button_text || 'Shop Now'),
+                                button_link: isClean ? '' : prev.button_link,
                               }));
                             }}
                             onChange={(url, suggestedText) =>
