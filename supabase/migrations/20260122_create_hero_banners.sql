@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.hero_banners (
     secondary_button_text TEXT DEFAULT 'Our Story',
     secondary_button_link TEXT DEFAULT '/about',
     show_buttons BOOLEAN DEFAULT true,
+    hide_overlay BOOLEAN DEFAULT false,
     sort_order INTEGER DEFAULT 1,
     is_active BOOLEAN DEFAULT true,
     aspect_ratio TEXT DEFAULT '16:9',
@@ -21,6 +22,9 @@ CREATE TABLE IF NOT EXISTS public.hero_banners (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- Ensure column exists if table was already created
+ALTER TABLE public.hero_banners ADD COLUMN IF NOT EXISTS hide_overlay BOOLEAN DEFAULT false;
 
 -- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.hero_banners ENABLE ROW LEVEL SECURITY;
@@ -66,11 +70,9 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('product-images', 'product-images', true)
 ON CONFLICT (id) DO UPDATE SET public = true;
 
--- 7. Storage RLS Policies: allow public read of images
+-- 7. Drop broad SELECT policy to eliminate Supabase "Clients can list all files in this bucket" warning
+-- (Not needed because product-images is already a public bucket, so direct image URLs work automatically)
 DROP POLICY IF EXISTS "Public Access to product-images" ON storage.objects;
-CREATE POLICY "Public Access to product-images"
-ON storage.objects FOR SELECT
-USING (bucket_id = 'product-images');
 
 -- 8. Storage RLS Policies: allow uploads into product-images
 DROP POLICY IF EXISTS "Allow uploads to product-images" ON storage.objects;

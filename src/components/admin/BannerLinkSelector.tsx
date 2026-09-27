@@ -18,6 +18,7 @@ interface BannerLinkSelectorProps {
   categories?: Array<{ id: string; name: string; slug?: string }>;
   products?: Array<{ id: string; name: string; slug?: string; price?: number }>;
   defaultSuggestedText?: string;
+  onSelectCleanGraphic?: () => void;
 }
 
 export default function BannerLinkSelector({
@@ -28,6 +29,7 @@ export default function BannerLinkSelector({
   categories = [],
   products = [],
   defaultSuggestedText,
+  onSelectCleanGraphic,
 }: BannerLinkSelectorProps) {
   // Build dynamic standard pages
   const standardPages: BannerLinkOption[] = [
@@ -86,7 +88,12 @@ export default function BannerLinkSelector({
     const selected = e.target.value;
     setSelectedDropdownValue(selected);
 
-    if (selected === '__custom__') {
+    if (selected === '__clean_ad_poster__') {
+      if (onSelectCleanGraphic) {
+        onSelectCleanGraphic();
+      }
+      onChange('/products', '');
+    } else if (selected === '__custom__') {
       const customVal = customInputValue || '/';
       onChange(customVal, defaultSuggestedText || 'Explore');
     } else {
@@ -122,6 +129,14 @@ export default function BannerLinkSelector({
           onChange={handleSelectChange}
           className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium text-foreground cursor-pointer"
         >
+          {onSelectCleanGraphic && (
+            <optgroup label="🎉 Festival / Promotion Preset">
+              <option value="__clean_ad_poster__">
+                🎨 Clean Festival / Ad Poster (No Text, No Buttons, No Shadow)
+              </option>
+            </optgroup>
+          )}
+
           <optgroup label="📌 Standard Store Pages">
             {standardPages.map((opt) => (
               <option key={opt.value} value={opt.value}>

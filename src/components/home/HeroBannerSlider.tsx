@@ -117,9 +117,10 @@ export default function HeroBannerSlider() {
   };
 
   const currentBanner = banners[currentIndex] || banners[0] || DEFAULT_BANNERS[0];
-  const showButtons = currentBanner.show_buttons !== false;
-  const hasText = Boolean(currentBanner.title || currentBanner.subtitle || currentBanner.badge_text);
-  const hasOverlay = hasText || showButtons;
+  const isCleanGraphicMode = currentBanner.hide_overlay === true || (!currentBanner.title?.trim() && !currentBanner.subtitle?.trim() && !currentBanner.badge_text?.trim() && currentBanner.show_buttons === false);
+  const showButtons = !isCleanGraphicMode && currentBanner.show_buttons !== false;
+  const hasText = !isCleanGraphicMode && Boolean(currentBanner.title?.trim() || currentBanner.subtitle?.trim() || currentBanner.badge_text?.trim());
+  const hasOverlay = !isCleanGraphicMode && (hasText || showButtons);
   const primaryBtnText = currentBanner.button_text || 'Shop Now';
   const primaryBtnLink = currentBanner.button_link || '/products';
   const secondaryBtnText = currentBanner.secondary_button_text || 'Our Story';
@@ -174,14 +175,12 @@ export default function HeroBannerSlider() {
               loading="eager"
             />
 
-            {/* Gradient Overlay for high-contrast readability on any image */}
+            {/* Gradient Overlay for high-contrast readability (only when text or buttons exist) */}
             {hasOverlay ? (
               <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 sm:via-black/35 to-transparent pointer-events-none" />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-            )}
+            ) : null}
 
-            {/* Direct banner background link if buttons are disabled */}
+            {/* Direct banner background link if buttons are disabled (e.g. clean festival/ad poster) */}
             {!showButtons && primaryBtnLink && (
               <Link
                 to={primaryBtnLink}
@@ -210,14 +209,14 @@ export default function HeroBannerSlider() {
 
                   {/* Title */}
                   {currentBanner.title && (
-                    <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-white leading-tight mb-1.5 sm:mb-3 md:mb-4 drop-shadow-md">
+                    <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-serif font-bold text-white leading-tight mb-1.5 sm:mb-3 md:mb-4 drop-shadow-md whitespace-pre-line">
                       {currentBanner.title}
                     </h1>
                   )}
 
                   {/* Subtitle */}
                   {currentBanner.subtitle && (
-                    <p className="text-xs sm:text-base md:text-lg text-white/90 mb-3 sm:mb-6 leading-relaxed line-clamp-2 sm:line-clamp-3 max-w-lg drop-shadow">
+                    <p className="text-xs sm:text-base md:text-lg text-white/90 mb-3 sm:mb-6 leading-relaxed line-clamp-3 sm:line-clamp-4 max-w-lg drop-shadow whitespace-pre-line">
                       {currentBanner.subtitle}
                     </p>
                   )}

@@ -9,6 +9,7 @@ export interface HeroBanner {
   secondary_button_text?: string;
   secondary_button_link?: string;
   show_buttons?: boolean;
+  hide_overlay?: boolean;
   sort_order: number;
   is_active: boolean;
   aspect_ratio?: string; // e.g. "16:9"

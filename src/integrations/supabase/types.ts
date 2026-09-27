@@ -91,6 +91,7 @@ export type Database = {
           button_text: string | null
           created_at: string
           height: number | null
+          hide_overlay: boolean | null
           id: string
           image_url: string
           is_active: boolean
@@ -110,6 +111,7 @@ export type Database = {
           button_text?: string | null
           created_at?: string
           height?: number | null
+          hide_overlay?: boolean | null
           id: string
           image_url: string
           is_active?: boolean
@@ -129,6 +131,7 @@ export type Database = {
           button_text?: string | null
           created_at?: string
           height?: number | null
+          hide_overlay?: boolean | null
           id?: string
           image_url?: string
           is_active?: boolean

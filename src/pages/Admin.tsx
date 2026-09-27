@@ -566,6 +566,7 @@ export default function Admin() {
     secondary_button_text: string;
     secondary_button_link: string;
     show_buttons: boolean;
+    hide_overlay: boolean;
     sort_order: number;
     is_active: boolean;
   }>({
@@ -577,6 +578,7 @@ export default function Admin() {
     secondary_button_text: 'Our Story',
     secondary_button_link: '/about',
     show_buttons: true,
+    hide_overlay: false,
     sort_order: 1,
     is_active: true,
   });
@@ -661,6 +663,7 @@ export default function Admin() {
     secondary_button_text: string;
     secondary_button_link: string;
     show_buttons: boolean;
+    hide_overlay: boolean;
     sort_order: number;
     is_active: boolean;
     current_image_url: string;
@@ -676,6 +679,7 @@ export default function Admin() {
     secondary_button_text: 'Our Story',
     secondary_button_link: '/about',
     show_buttons: true,
+    hide_overlay: false,
     sort_order: 1,
     is_active: true,
     current_image_url: '',
@@ -1527,14 +1531,15 @@ export default function Admin() {
 
       await createHeroBanner({
         image_url: finalImageUrl,
-        title: bannerForm.title.trim() || undefined,
-        subtitle: bannerForm.subtitle.trim() || undefined,
-        badge_text: bannerForm.badge_text.trim() || undefined,
+        title: bannerForm.hide_overlay ? undefined : bannerForm.title.trim() || undefined,
+        subtitle: bannerForm.hide_overlay ? undefined : bannerForm.subtitle.trim() || undefined,
+        badge_text: bannerForm.hide_overlay ? undefined : bannerForm.badge_text.trim() || undefined,
         button_text: bannerForm.button_text.trim() || 'Shop Now',
         button_link: bannerForm.button_link.trim() || '/products',
         secondary_button_text: bannerForm.secondary_button_text.trim() || 'Our Story',
         secondary_button_link: bannerForm.secondary_button_link.trim() || '/about',
-        show_buttons: bannerForm.show_buttons !== false,
+        show_buttons: !bannerForm.hide_overlay && bannerForm.show_buttons !== false,
+        hide_overlay: bannerForm.hide_overlay,
         sort_order: Number(bannerForm.sort_order) || (banners.length + 1),
         is_active: bannerForm.is_active,
         aspect_ratio: '16:9',
@@ -1554,6 +1559,7 @@ export default function Admin() {
         secondary_button_text: 'Our Story',
         secondary_button_link: '/about',
         show_buttons: true,
+        hide_overlay: false,
         sort_order: banners.length + 2,
         is_active: true,
       });
@@ -1637,6 +1643,7 @@ export default function Admin() {
       secondary_button_text: banner.secondary_button_text || 'Our Story',
       secondary_button_link: banner.secondary_button_link || '/about',
       show_buttons: banner.show_buttons !== false,
+      hide_overlay: banner.hide_overlay ?? (!banner.title && !banner.subtitle && banner.show_buttons === false),
       sort_order: banner.sort_order || 1,
       is_active: banner.is_active,
       current_image_url: banner.image_url,
@@ -1705,14 +1712,15 @@ export default function Admin() {
 
       await updateHeroBanner(editingBanner.id, {
         image_url: finalImageUrl,
-        title: editBannerForm.title.trim() || undefined,
-        subtitle: editBannerForm.subtitle.trim() || undefined,
-        badge_text: editBannerForm.badge_text.trim() || undefined,
+        title: editBannerForm.hide_overlay ? undefined : editBannerForm.title.trim() || undefined,
+        subtitle: editBannerForm.hide_overlay ? undefined : editBannerForm.subtitle.trim() || undefined,
+        badge_text: editBannerForm.hide_overlay ? undefined : editBannerForm.badge_text.trim() || undefined,
         button_text: editBannerForm.button_text.trim() || 'Shop Now',
         button_link: editBannerForm.button_link.trim() || '/products',
         secondary_button_text: editBannerForm.secondary_button_text.trim() || 'Our Story',
         secondary_button_link: editBannerForm.secondary_button_link.trim() || '/about',
-        show_buttons: editBannerForm.show_buttons !== false,
+        show_buttons: !editBannerForm.hide_overlay && editBannerForm.show_buttons !== false,
+        hide_overlay: editBannerForm.hide_overlay,
         sort_order: Number(editBannerForm.sort_order) || 1,
         is_active: editBannerForm.is_active,
       });
@@ -2792,36 +2800,43 @@ export default function Admin() {
                               alt="16:9 Banner Preview"
                               className="w-full h-full object-cover"
                             />
-                            {/* Overlay simulator with buttons */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left pointer-events-none">
-                              <div className="max-w-xs space-y-1.5">
-                                {bannerForm.badge_text && (
-                                  <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
-                                    {bannerForm.badge_text}
-                                  </span>
-                                )}
-                                {bannerForm.title && (
-                                  <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight">
-                                    {bannerForm.title}
-                                  </h4>
-                                )}
-                                {bannerForm.subtitle && (
-                                  <p className="text-[10px] text-white/80 line-clamp-2 leading-relaxed">
-                                    {bannerForm.subtitle}
-                                  </p>
-                                )}
-                                {bannerForm.show_buttons && (
-                                  <div className="flex items-center gap-1.5 pt-1">
-                                    <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
-                                      {bannerForm.button_text || 'Shop Now'} →
+                            {/* Overlay simulator with buttons (Hidden if Clean Festival / Ad Poster mode is selected) */}
+                            {!bannerForm.hide_overlay && (bannerForm.title || bannerForm.subtitle || bannerForm.badge_text || bannerForm.show_buttons) && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent flex items-center p-4 sm:p-6 text-left pointer-events-none">
+                                <div className="max-w-xs space-y-1.5">
+                                  {bannerForm.badge_text && (
+                                    <span className="inline-block px-2 py-0.5 bg-accent/90 text-accent-foreground text-[9px] font-semibold rounded-full">
+                                      {bannerForm.badge_text}
                                     </span>
-                                    <span className="inline-block px-2 py-1 bg-white/15 border border-white/30 text-white text-[10px] font-medium rounded-md shadow-sm">
-                                      {bannerForm.secondary_button_text || 'Our Story'}
-                                    </span>
-                                  </div>
-                                )}
+                                  )}
+                                  {bannerForm.title && (
+                                    <h4 className="text-sm sm:text-base font-serif font-bold text-white leading-tight whitespace-pre-line">
+                                      {bannerForm.title}
+                                    </h4>
+                                  )}
+                                  {bannerForm.subtitle && (
+                                    <p className="text-[10px] text-white/80 line-clamp-3 leading-relaxed whitespace-pre-line">
+                                      {bannerForm.subtitle}
+                                    </p>
+                                  )}
+                                  {bannerForm.show_buttons && (
+                                    <div className="flex items-center gap-1.5 pt-1">
+                                      <span className="inline-block px-2.5 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-md shadow-sm">
+                                        {bannerForm.button_text || 'Shop Now'} →
+                                      </span>
+                                      <span className="inline-block px-2 py-1 bg-white/15 border border-white/30 text-white text-[10px] font-medium rounded-md shadow-sm">
+                                        {bannerForm.secondary_button_text || 'Our Story'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
+                            )}
+                            {bannerForm.hide_overlay && (
+                              <div className="absolute top-2 left-2 px-2.5 py-1 rounded bg-emerald-600/90 text-[10px] text-white font-semibold shadow-md flex items-center gap-1 backdrop-blur-sm">
+                                🎨 Clean Poster Mode (0% Shadow • Crisp Graphic)
+                              </div>
+                            )}
                             <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20">
                               16:9 • {bannerValidationState.width}×{bannerValidationState.height}
                             </div>
@@ -2840,84 +2855,136 @@ export default function Admin() {
                   </div>
                 </div>
 
-                {/* Optional Content Overlays & Click URL Configuration */}
-                <div className="pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="banner-badge" className="text-xs">
-                      Badge / Tag (Optional)
-                    </Label>
-                    <Input
-                      id="banner-badge"
-                      placeholder="e.g. Premium Indian Spices"
-                      value={bannerForm.badge_text}
-                      onChange={(e) => setBannerForm({ ...bannerForm, badge_text: e.target.value })}
-                      className="text-xs mt-1"
-                    />
+                {/* Banner Style & Content Mode */}
+                <div className="pt-4 border-t border-border space-y-4">
+                  <div className="p-4 rounded-xl border border-primary/25 bg-primary/5 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <Label htmlFor="banner-mode-select" className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-primary" />
+                          Banner Display Mode / Preset
+                        </Label>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Choose whether this banner shows title overlays & action buttons, or acts as a crisp full-slide graphic without text or shadow.
+                        </p>
+                      </div>
+                      <select
+                        id="banner-mode-select"
+                        value={bannerForm.hide_overlay ? 'clean' : 'standard'}
+                        onChange={(e) => {
+                          const isClean = e.target.value === 'clean';
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            hide_overlay: isClean,
+                            show_buttons: !isClean,
+                          }));
+                        }}
+                        className="h-9 px-3 text-xs rounded-lg border border-border bg-background font-semibold cursor-pointer shadow-sm text-foreground focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="standard">Standard Banner (With Title, Subtitle & Buttons)</option>
+                        <option value="clean">🎨 Clean Festival / Ad Poster (No Text, No Buttons, No Shadow)</option>
+                      </select>
+                    </div>
+                    {bannerForm.hide_overlay && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                        ✓ Clean Festival / Ad Poster mode active: 0% shadow, no dark gradient, and no overlaid buttons. Clicking the banner will navigate directly to the Destination link selected below!
+                      </div>
+                    )}
                   </div>
 
-                  <div>
-                    <Label htmlFor="banner-title" className="text-xs">
-                      Banner Heading / Title (Optional)
-                    </Label>
-                    <Input
-                      id="banner-title"
-                      placeholder="e.g. Authentic Flavors, Straight from India"
-                      value={bannerForm.title}
-                      onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
-                      className="text-xs mt-1"
-                    />
-                  </div>
+                  {/* Content Inputs Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="banner-badge" className="text-xs">
+                        Badge / Tag (Optional)
+                      </Label>
+                      <Input
+                        id="banner-badge"
+                        placeholder="e.g. Premium Indian Spices"
+                        value={bannerForm.badge_text}
+                        onChange={(e) => setBannerForm({ ...bannerForm, badge_text: e.target.value })}
+                        className="text-xs mt-1"
+                      />
+                    </div>
 
-                  <div>
-                    <Label htmlFor="banner-subtitle" className="text-xs">
-                      Subtitle / Caption (Optional)
-                    </Label>
-                    <Input
-                      id="banner-subtitle"
-                      placeholder="e.g. Experience the rich heritage of Indian cuisine"
-                      value={bannerForm.subtitle}
-                      onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
-                      className="text-xs mt-1"
-                    />
-                  </div>
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="banner-title" className="text-xs">
+                          Banner Heading / Title (Optional)
+                        </Label>
+                        <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
+                      </div>
+                      <Textarea
+                        id="banner-title"
+                        rows={2}
+                        placeholder="e.g. Authentic Flavors,&#10;Straight from India"
+                        value={bannerForm.title}
+                        onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                        className="text-xs mt-1 resize-none"
+                      />
+                    </div>
 
-                  <div>
-                    <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
-                      Primary Button Text
-                    </Label>
-                    <Input
-                      id="banner-btn-text"
-                      placeholder="Shop Now"
-                      value={bannerForm.button_text}
-                      onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
-                      className="text-xs mt-1"
-                    />
-                  </div>
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="banner-subtitle" className="text-xs">
+                          Subtitle / Caption (Optional)
+                        </Label>
+                        <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
+                      </div>
+                      <Textarea
+                        id="banner-subtitle"
+                        rows={2}
+                        placeholder="e.g. Experience the rich heritage of Indian cuisine&#10;Handcrafted in Abohar"
+                        value={bannerForm.subtitle}
+                        onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
+                        className="text-xs mt-1 resize-none"
+                      />
+                    </div>
 
-                  <div>
-                    <BannerLinkSelector
-                      id="banner-btn-link"
-                      label="Primary Button Destination"
-                      value={bannerForm.button_link}
-                      onChange={(url, suggestedText) => {
-                        setBannerForm((prev) => ({
-                          ...prev,
-                          button_link: url,
-                          button_text:
-                            suggestedText &&
-                            (!prev.button_text ||
-                              prev.button_text === 'Shop Now' ||
-                              prev.button_text.startsWith('Shop') ||
-                              prev.button_text.startsWith('Buy'))
-                              ? suggestedText
-                              : prev.button_text,
-                        }));
-                      }}
-                      categories={categories}
-                      products={products}
-                      defaultSuggestedText="Shop Now"
-                    />
-                  </div>
+                    <div>
+                      <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
+                        Primary Button Text {bannerForm.hide_overlay && '(Omitted in Poster mode)'}
+                      </Label>
+                      <Input
+                        id="banner-btn-text"
+                        placeholder="Shop Now"
+                        value={bannerForm.button_text}
+                        onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
+                        className="text-xs mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <BannerLinkSelector
+                        id="banner-btn-link"
+                        label={bannerForm.hide_overlay ? "Banner Destination (Clicking Poster Opens)" : "Primary Button Destination"}
+                        value={bannerForm.button_link}
+                        onSelectCleanGraphic={() => {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            hide_overlay: true,
+                            show_buttons: false,
+                          }));
+                        }}
+                        onChange={(url, suggestedText) => {
+                          setBannerForm((prev) => ({
+                            ...prev,
+                            button_link: url,
+                            button_text:
+                              suggestedText &&
+                              (!prev.button_text ||
+                                prev.button_text === 'Shop Now' ||
+                                prev.button_text.startsWith('Shop') ||
+                                prev.button_text.startsWith('Buy'))
+                                ? suggestedText
+                                : prev.button_text,
+                          }));
+                        }}
+                        categories={categories}
+                        products={products}
+                        defaultSuggestedText="Shop Now"
+                      />
+                    </div>
 
                   <div>
                     <Label htmlFor="banner-sec-btn-text" className="text-xs">
@@ -2968,6 +3035,7 @@ export default function Admin() {
                       className="text-xs mt-1"
                     />
                   </div>
+                </div>
                 </div>
 
                 {/* Submit Actions */}
@@ -3767,33 +3835,77 @@ export default function Admin() {
                     </div>
                   </div>
 
+                  {/* Banner Mode / Style Selector */}
+                  <div className="p-3.5 rounded-xl border border-primary/25 bg-primary/5 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <Label htmlFor="edit-banner-mode-select" className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-primary" />
+                          Banner Display Mode / Preset
+                        </Label>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Choose standard text overlay or crisp poster mode (no text, no buttons, 0% shadow).
+                        </p>
+                      </div>
+                      <select
+                        id="edit-banner-mode-select"
+                        value={editBannerForm.hide_overlay ? 'clean' : 'standard'}
+                        onChange={(e) => {
+                          const isClean = e.target.value === 'clean';
+                          setEditBannerForm((prev) => ({
+                            ...prev,
+                            hide_overlay: isClean,
+                            show_buttons: !isClean,
+                          }));
+                        }}
+                        className="h-9 px-3 text-xs rounded-lg border border-border bg-background font-semibold cursor-pointer shadow-sm text-foreground focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="standard">Standard Banner (With Title, Subtitle & Buttons)</option>
+                        <option value="clean">🎨 Clean Festival / Ad Poster (No Text, No Buttons, No Shadow)</option>
+                      </select>
+                    </div>
+                    {editBannerForm.hide_overlay && (
+                      <div className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                        ✓ Clean Festival / Ad Poster mode active: 0% shadow, no dark gradient, and no overlaid buttons. Clicking the banner will navigate directly to the Primary Destination link!
+                      </div>
+                    )}
+                  </div>
+
                   <div>
-                    <Label htmlFor="edit-banner-title" className="text-xs">
-                      Banner Heading / Title (Optional)
-                    </Label>
-                    <Input
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="edit-banner-title" className="text-xs">
+                        Banner Heading / Title (Optional)
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
+                    </div>
+                    <Textarea
                       id="edit-banner-title"
-                      placeholder="e.g. Authentic Flavors, Straight from India"
+                      rows={2}
+                      placeholder="e.g. Authentic Flavors,&#10;Straight from India"
                       value={editBannerForm.title}
                       onChange={(e) =>
                         setEditBannerForm({ ...editBannerForm, title: e.target.value })
                       }
-                      className="text-xs mt-1"
+                      className="text-xs mt-1 resize-none font-sans"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-banner-subtitle" className="text-xs">
-                      Subtitle / Caption (Optional)
-                    </Label>
-                    <Input
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="edit-banner-subtitle" className="text-xs">
+                        Subtitle / Caption (Optional)
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground font-mono">Press Enter for new line</span>
+                    </div>
+                    <Textarea
                       id="edit-banner-subtitle"
+                      rows={2}
                       placeholder="e.g. Experience the rich heritage of Indian cuisine"
                       value={editBannerForm.subtitle}
                       onChange={(e) =>
                         setEditBannerForm({ ...editBannerForm, subtitle: e.target.value })
                       }
-                      className="text-xs mt-1"
+                      className="text-xs mt-1 resize-none font-sans"
                     />
                   </div>
 
@@ -3828,8 +3940,15 @@ export default function Admin() {
                         <div>
                           <BannerLinkSelector
                             id="edit-banner-primary-link"
-                            label="Primary Button Destination"
+                            label={editBannerForm.hide_overlay ? "Banner Destination (Clicking Poster Opens)" : "Primary Button Destination"}
                             value={editBannerForm.button_link}
+                            onSelectCleanGraphic={() => {
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                hide_overlay: true,
+                                show_buttons: false,
+                              }));
+                            }}
                             onChange={(url, suggestedText) =>
                               setEditBannerForm((prev) => ({
                                 ...prev,
