@@ -169,6 +169,78 @@ export async function reorderHeroBanners(orderedBanners: HeroBanner[]): Promise<
 }
 
 /**
+ * Automatically migrate and sync any locally cached banners into Supabase
+ */
+export async function syncLocalBannersToSupabase(): Promise<HeroBanner[]> {
+  const local = getLocalBanners();
+  if (!local || local.length === 0) return [];
+
+  const migrated: HeroBanner[] = [];
+
+  for (const b of local) {
+    let finalImageUrl = b.image_url;
+
+    // If banner has base64 dataUrl, upload it into Supabase Storage
+    if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+      try {
+        const res = await fetch(finalImageUrl);
+        const blob = await res.blob();
+        const ext = blob.type.includes('png') ? 'png' : 'jpg';
+        const fileName = `banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(`banners/${fileName}`, blob, { contentType: blob.type, upsert: true });
+
+        if (!uploadError) {
+          const { data: pubData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(`banners/${fileName}`);
+          if (pubData?.publicUrl) {
+            finalImageUrl = pubData.publicUrl;
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Storage upload error during migration:', uploadErr);
+      }
+    }
+
+    const payload = {
+      id: b.id,
+      image_url: finalImageUrl,
+      badge_text: b.badge_text || null,
+      title: b.title || null,
+      subtitle: b.subtitle || null,
+      button_text: b.button_text || 'Shop Now',
+      button_link: b.button_link || '/products',
+      secondary_button_text: b.secondary_button_text || 'Our Story',
+      secondary_button_link: b.secondary_button_link || '/about',
+      show_buttons: b.show_buttons !== false,
+      sort_order: b.sort_order || 1,
+      is_active: b.is_active,
+      aspect_ratio: b.aspect_ratio || '16:9',
+      width: b.width || 1920,
+      height: b.height || 1080,
+    };
+
+    try {
+      const { error: insertErr } = await supabase.from('hero_banners').upsert(payload);
+      if (!insertErr) {
+        migrated.push({ ...b, image_url: finalImageUrl });
+      }
+    } catch (insertErr) {
+      console.warn('Error inserting banner into Supabase:', insertErr);
+    }
+  }
+
+  if (migrated.length > 0) {
+    setLocalBanners(migrated);
+    broadcastBannerChange();
+  }
+
+  return migrated;
+}
+
+/**
  * Fetch all hero banners (active and inactive for admin, or filtered for storefront)
  */
 export async function fetchHeroBanners(onlyActive = false): Promise<HeroBanner[]> {
@@ -178,19 +250,32 @@ export async function fetchHeroBanners(onlyActive = false): Promise<HeroBanner[]
       .select('*')
       .order('sort_order', { ascending: true });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
-      const sorted = [...(data as unknown as HeroBanner[])].sort(
-        (a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
-      );
-      setLocalBanners(sorted);
-      if (onlyActive) {
-        const activeOnly = sorted.filter((b: HeroBanner) => b.is_active);
-        return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
+    if (!error && Array.isArray(data)) {
+      if (data.length > 0) {
+        const sorted = [...(data as unknown as HeroBanner[])].sort(
+          (a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+        );
+        setLocalBanners(sorted);
+        if (onlyActive) {
+          const activeOnly = sorted.filter((b: HeroBanner) => b.is_active);
+          return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
+        }
+        return sorted;
+      } else {
+        // Supabase table is empty ([]), but we have local banners in browser!
+        // Automatically sync local banners to Supabase table right now:
+        const migrated = await syncLocalBannersToSupabase();
+        if (migrated.length > 0) {
+          if (onlyActive) {
+            const activeOnly = migrated.filter((b) => b.is_active);
+            return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
+          }
+          return migrated;
+        }
       }
-      return sorted;
     }
   } catch (err) {
-    console.log('Supabase hero_banners table not configured or offline, using local storage fallback:', err);
+    console.log('Supabase hero_banners query notice:', err);
   }
 
   // Fallback to local storage
