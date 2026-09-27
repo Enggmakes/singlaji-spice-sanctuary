@@ -32,6 +32,7 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
