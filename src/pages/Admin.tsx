@@ -2881,6 +2881,79 @@ export default function Admin() {
                   </div>
 
                   <div>
+                    <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
+                      Primary Button Text
+                    </Label>
+                    <Input
+                      id="banner-btn-text"
+                      placeholder="Shop Now"
+                      value={bannerForm.button_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <BannerLinkSelector
+                      id="banner-btn-link"
+                      label="Primary Button Destination"
+                      value={bannerForm.button_link}
+                      onChange={(url, suggestedText) => {
+                        setBannerForm((prev) => ({
+                          ...prev,
+                          button_link: url,
+                          button_text:
+                            suggestedText &&
+                            (!prev.button_text ||
+                              prev.button_text === 'Shop Now' ||
+                              prev.button_text.startsWith('Shop') ||
+                              prev.button_text.startsWith('Buy'))
+                              ? suggestedText
+                              : prev.button_text,
+                        }));
+                      }}
+                      categories={categories}
+                      products={products}
+                      defaultSuggestedText="Shop Now"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="banner-sec-btn-text" className="text-xs">
+                      Secondary Button Text
+                    </Label>
+                    <Input
+                      id="banner-sec-btn-text"
+                      placeholder="Our Story"
+                      value={bannerForm.secondary_button_text}
+                      onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_text: e.target.value })}
+                      className="text-xs mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <BannerLinkSelector
+                      id="banner-sec-btn-link"
+                      label="Secondary Button Destination"
+                      value={bannerForm.secondary_button_link}
+                      onChange={(url, suggestedText) => {
+                        setBannerForm((prev) => ({
+                          ...prev,
+                          secondary_button_link: url,
+                          secondary_button_text:
+                            suggestedText &&
+                            (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                              ? suggestedText
+                              : prev.secondary_button_text,
+                        }));
+                      }}
+                      categories={categories}
+                      products={products}
+                      defaultSuggestedText="Our Story"
+                    />
+                  </div>
+
+                  <div>
                     <Label htmlFor="banner-order" className="text-xs">
                       Display Sequence Number
                     </Label>
@@ -2896,9 +2969,9 @@ export default function Admin() {
                   </div>
                 </div>
 
-                {/* Button & Destination Link Controls */}
-                <div className="p-4 rounded-xl border border-border bg-muted/20 space-y-4">
-                  <div className="flex items-center justify-between">
+                {/* Submit Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
+                  <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -2910,108 +2983,7 @@ export default function Admin() {
                         Show "Shop Now" & "Our Story" Buttons on Slide
                       </span>
                     </label>
-                  </div>
 
-                  {bannerForm.show_buttons ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                      <div>
-                        <Label htmlFor="banner-btn-text" className="text-xs font-semibold text-primary">
-                          Primary Button Text
-                        </Label>
-                        <Input
-                          id="banner-btn-text"
-                          placeholder="Shop Now"
-                          value={bannerForm.button_text}
-                          onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
-                          className="text-xs mt-1"
-                        />
-                      </div>
-
-                      <div>
-                        <BannerLinkSelector
-                          id="banner-btn-link"
-                          label="Primary Button Destination"
-                          value={bannerForm.button_link}
-                          onChange={(url, suggestedText) => {
-                            setBannerForm((prev) => ({
-                              ...prev,
-                              button_link: url,
-                              button_text:
-                                suggestedText &&
-                                (!prev.button_text ||
-                                  prev.button_text === 'Shop Now' ||
-                                  prev.button_text.startsWith('Shop') ||
-                                  prev.button_text.startsWith('Buy'))
-                                  ? suggestedText
-                                  : prev.button_text,
-                            }));
-                          }}
-                          categories={categories}
-                          products={products}
-                          defaultSuggestedText="Shop Now"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="banner-sec-btn-text" className="text-xs">
-                          Secondary Button Text
-                        </Label>
-                        <Input
-                          id="banner-sec-btn-text"
-                          placeholder="Our Story"
-                          value={bannerForm.secondary_button_text}
-                          onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_text: e.target.value })}
-                          className="text-xs mt-1"
-                        />
-                      </div>
-
-                      <div>
-                        <BannerLinkSelector
-                          id="banner-sec-btn-link"
-                          label="Secondary Button Destination"
-                          value={bannerForm.secondary_button_link}
-                          onChange={(url, suggestedText) => {
-                            setBannerForm((prev) => ({
-                              ...prev,
-                              secondary_button_link: url,
-                              secondary_button_text:
-                                suggestedText &&
-                                (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
-                                  ? suggestedText
-                                  : prev.secondary_button_text,
-                            }));
-                          }}
-                          categories={categories}
-                          products={products}
-                          defaultSuggestedText="Our Story"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 pt-1">
-                      <BannerLinkSelector
-                        id="banner-btn-link"
-                        label="Banner Click Destination (Where should clicking this banner take the customer?)"
-                        value={bannerForm.button_link || '/products'}
-                        onChange={(url) => {
-                          setBannerForm((prev) => ({
-                            ...prev,
-                            button_link: url,
-                          }));
-                        }}
-                        categories={categories}
-                        products={products}
-                      />
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                        ✓ Buttons are hidden. Clicking anywhere on this 2.4:1 banner image will open this destination.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Submit Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
-                  <div className="flex flex-wrap items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -3832,111 +3804,92 @@ export default function Admin() {
 
                   {/* Button Controls */}
                   <div className="p-3.5 rounded-xl border border-border bg-muted/20 space-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={editBannerForm.show_buttons}
-                        onChange={(e) =>
-                          setEditBannerForm({ ...editBannerForm, show_buttons: e.target.checked })
-                        }
-                        className="rounded border-border text-primary focus:ring-primary h-4 w-4"
-                      />
-                      <span className="text-xs font-semibold text-foreground">
-                        Show "Shop Now" & "Our Story" Buttons on Slide
-                      </span>
-                    </label>
-
-                    {editBannerForm.show_buttons ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                        <div>
-                          <Label className="text-[11px] text-muted-foreground">Primary Button Text</Label>
-                          <Input
-                            value={editBannerForm.button_text}
-                            onChange={(e) =>
-                              setEditBannerForm({ ...editBannerForm, button_text: e.target.value })
-                            }
-                            className="text-xs mt-0.5"
-                          />
-                        </div>
-                        <div>
-                          <BannerLinkSelector
-                            id="edit-banner-primary-link"
-                            label="Primary Button Destination"
-                            value={editBannerForm.button_link}
-                            onChange={(url, suggestedText) =>
-                              setEditBannerForm((prev) => ({
-                                ...prev,
-                                button_link: url,
-                                button_text:
-                                  suggestedText &&
-                                  (!prev.button_text ||
-                                    prev.button_text === 'Shop Now' ||
-                                    prev.button_text.startsWith('Shop') ||
-                                    prev.button_text.startsWith('Buy'))
-                                    ? suggestedText
-                                    : prev.button_text,
-                              }))
-                            }
-                            categories={categories}
-                            products={products}
-                            defaultSuggestedText="Shop Now"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-[11px] text-muted-foreground">Secondary Button Text</Label>
-                          <Input
-                            value={editBannerForm.secondary_button_text}
-                            onChange={(e) =>
-                              setEditBannerForm({
-                                ...editBannerForm,
-                                secondary_button_text: e.target.value,
-                              })
-                            }
-                            className="text-xs mt-0.5"
-                          />
-                        </div>
-                        <div>
-                          <BannerLinkSelector
-                            id="edit-banner-secondary-link"
-                            label="Secondary Button Destination"
-                            value={editBannerForm.secondary_button_link}
-                            onChange={(url, suggestedText) =>
-                              setEditBannerForm((prev) => ({
-                                ...prev,
-                                secondary_button_link: url,
-                                secondary_button_text:
-                                  suggestedText &&
-                                  (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
-                                    ? suggestedText
-                                    : prev.secondary_button_text,
-                              }))
-                            }
-                            categories={categories}
-                            products={products}
-                            defaultSuggestedText="Our Story"
-                          />
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground">Primary Button Text</Label>
+                        <Input
+                          value={editBannerForm.button_text}
+                          onChange={(e) =>
+                            setEditBannerForm({ ...editBannerForm, button_text: e.target.value })
+                          }
+                          className="text-xs mt-0.5"
+                        />
                       </div>
-                    ) : (
-                      <div className="space-y-2 pt-1">
+                      <div>
                         <BannerLinkSelector
                           id="edit-banner-primary-link"
-                          label="Banner Click Destination (Where should clicking this banner take the customer?)"
-                          value={editBannerForm.button_link || '/products'}
-                          onChange={(url) =>
+                          label="Primary Button Destination"
+                          value={editBannerForm.button_link}
+                          onChange={(url, suggestedText) =>
                             setEditBannerForm((prev) => ({
                               ...prev,
                               button_link: url,
+                              button_text:
+                                suggestedText &&
+                                (!prev.button_text ||
+                                  prev.button_text === 'Shop Now' ||
+                                  prev.button_text.startsWith('Shop') ||
+                                  prev.button_text.startsWith('Buy'))
+                                  ? suggestedText
+                                  : prev.button_text,
                             }))
                           }
                           categories={categories}
                           products={products}
+                          defaultSuggestedText="Shop Now"
                         />
-                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                          ✓ Buttons are hidden. Clicking anywhere on this 2.4:1 banner image will open this destination.
-                        </p>
                       </div>
-                    )}
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground">Secondary Button Text</Label>
+                        <Input
+                          value={editBannerForm.secondary_button_text}
+                          onChange={(e) =>
+                            setEditBannerForm({
+                              ...editBannerForm,
+                              secondary_button_text: e.target.value,
+                            })
+                          }
+                          className="text-xs mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <BannerLinkSelector
+                          id="edit-banner-secondary-link"
+                          label="Secondary Button Destination"
+                          value={editBannerForm.secondary_button_link}
+                          onChange={(url, suggestedText) =>
+                            setEditBannerForm((prev) => ({
+                              ...prev,
+                              secondary_button_link: url,
+                              secondary_button_text:
+                                suggestedText &&
+                                (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                                  ? suggestedText
+                                  : prev.secondary_button_text,
+                            }))
+                          }
+                          categories={categories}
+                          products={products}
+                          defaultSuggestedText="Our Story"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-border/50">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={editBannerForm.show_buttons}
+                          onChange={(e) =>
+                            setEditBannerForm({ ...editBannerForm, show_buttons: e.target.checked })
+                          }
+                          className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                        />
+                        <span className="text-xs font-semibold text-foreground">
+                          Show "Shop Now" & "Our Story" Buttons on Slide
+                        </span>
+                      </label>
+                    </div>
                   </div>
 
                   {/* Active Toggle */}
