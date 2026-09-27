@@ -155,7 +155,7 @@ export async function reorderHeroBanners(orderedBanners: HeroBanner[]): Promise<
 
   try {
     for (const b of withUpdatedOrders) {
-      await (supabase as any)
+      await supabase
         .from('hero_banners')
         .update({ sort_order: b.sort_order, updated_at: b.updated_at })
         .eq('id', b.id);
@@ -173,13 +173,15 @@ export async function reorderHeroBanners(orderedBanners: HeroBanner[]): Promise<
  */
 export async function fetchHeroBanners(onlyActive = false): Promise<HeroBanner[]> {
   try {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('hero_banners')
       .select('*')
       .order('sort_order', { ascending: true });
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      const sorted = [...data].sort((a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      const sorted = [...(data as unknown as HeroBanner[])].sort(
+        (a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      );
       setLocalBanners(sorted);
       if (onlyActive) {
         const activeOnly = sorted.filter((b: HeroBanner) => b.is_active);
@@ -231,7 +233,12 @@ export async function createHeroBanner(
 
   // Try inserting into Supabase
   try {
-    await (supabase as any).from('hero_banners').insert(newBanner);
+    const { error } = await supabase.from('hero_banners').insert(newBanner);
+    if (error) {
+      console.warn('Supabase hero_banners insert notice:', error.message);
+    } else {
+      console.log('Hero banner successfully synchronized with Supabase database!');
+    }
   } catch (err) {
     console.log('Supabase hero_banners insert fallback to local storage:', err);
   }
@@ -253,10 +260,15 @@ export async function updateHeroBanner(
   updates: Partial<HeroBanner>
 ): Promise<void> {
   try {
-    await (supabase as any)
+    const { error } = await supabase
       .from('hero_banners')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id);
+    if (error) {
+      console.warn('Supabase hero_banners update notice:', error.message);
+    } else {
+      console.log('Hero banner update synchronized with Supabase!');
+    }
   } catch (err) {
     console.log('Supabase hero_banners update fallback to local storage:', err);
   }
@@ -273,7 +285,12 @@ export async function updateHeroBanner(
  */
 export async function deleteHeroBanner(id: string): Promise<void> {
   try {
-    await (supabase as any).from('hero_banners').delete().eq('id', id);
+    const { error } = await supabase.from('hero_banners').delete().eq('id', id);
+    if (error) {
+      console.warn('Supabase hero_banners delete notice:', error.message);
+    } else {
+      console.log('Hero banner deletion synchronized with Supabase!');
+    }
   } catch (err) {
     console.log('Supabase hero_banners delete fallback to local storage:', err);
   }

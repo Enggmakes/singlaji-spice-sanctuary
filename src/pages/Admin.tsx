@@ -74,6 +74,7 @@ import {
   WeightVariant,
 } from '@/lib/weightVariants';
 import { toast } from 'sonner';
+import BannerLinkSelector from '@/components/admin/BannerLinkSelector';
 
 interface Category {
   id: string;
@@ -84,6 +85,7 @@ interface Category {
 interface Product {
   id: string;
   name: string;
+  slug?: string;
   price: number;
   stock: number;
   image_url: string | null;
@@ -890,7 +892,7 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price, stock, image_url, category_id, description, weight')
+        .select('id, name, slug, price, stock, image_url, category_id, description, weight')
         .order('created_at', { ascending: false });
       if (error) throw error;
       if (data) setProducts(data);
@@ -1489,14 +1491,17 @@ export default function Admin() {
 
     setAddingBanner(true);
     try {
-      const cleanFileName = `banner-${Date.now()}-${bannerImageFile.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+      // 1. High-quality client-side compression (1920x1080 web resolution)
+      const comp = await compressImage(bannerImageFile, { maxWidth: 1920, maxHeight: 1080, quality: 0.85 });
+      const fileToUpload = comp.file;
+      const cleanFileName = `banner-${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
       let finalImageUrl = '';
 
-      // Upload image to Supabase storage 'product-images' inside 'banners/' folder
+      // 2. Upload image to Supabase storage 'product-images' inside 'banners/' folder
       try {
         const { error: uploadError } = await supabase.storage
           .from('product-images')
-          .upload(`banners/${cleanFileName}`, bannerImageFile, { upsert: true });
+          .upload(`banners/${cleanFileName}`, fileToUpload, { upsert: true });
 
         if (!uploadError) {
           const { data: { publicUrl } } = supabase.storage
@@ -1510,12 +1515,12 @@ export default function Admin() {
         console.warn('Storage upload exception, using local fallback:', uploadErr);
       }
 
-      // If storage bucket was unavailable or gave an error, fallback to data URL so the admin is never stuck
+      // 3. Fallback to optimized direct data URL if storage upload was blocked
       if (!finalImageUrl) {
-        finalImageUrl = await new Promise<string>((resolve) => {
+        finalImageUrl = comp.dataUrl || await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(bannerImageFile);
+          reader.readAsDataURL(fileToUpload);
         });
       }
 
@@ -1670,11 +1675,13 @@ export default function Admin() {
       let finalImageUrl = editBannerForm.current_image_url;
 
       if (editBannerForm.new_image_file) {
-        const cleanFileName = `banner-${Date.now()}-${editBannerForm.new_image_file.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+        const comp = await compressImage(editBannerForm.new_image_file, { maxWidth: 1920, maxHeight: 1080, quality: 0.85 });
+        const fileToUpload = comp.file;
+        const cleanFileName = `banner-${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
         try {
           const { error: uploadError } = await supabase.storage
             .from('product-images')
-            .upload(`banners/${cleanFileName}`, editBannerForm.new_image_file, { upsert: true });
+            .upload(`banners/${cleanFileName}`, fileToUpload, { upsert: true });
 
           if (!uploadError) {
             const { data: { publicUrl } } = supabase.storage
@@ -1687,10 +1694,10 @@ export default function Admin() {
         }
 
         if (finalImageUrl === editBannerForm.current_image_url) {
-          finalImageUrl = await new Promise<string>((resolve) => {
+          finalImageUrl = comp.dataUrl || await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(editBannerForm.new_image_file!);
+            reader.readAsDataURL(fileToUpload);
           });
         }
       }
@@ -2887,15 +2894,27 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <Label htmlFor="banner-btn-link" className="text-xs font-semibold text-primary">
-                      Primary Button Link
-                    </Label>
-                    <Input
+                    <BannerLinkSelector
                       id="banner-btn-link"
-                      placeholder="/products"
+                      label="Primary Button Destination"
                       value={bannerForm.button_link}
-                      onChange={(e) => setBannerForm({ ...bannerForm, button_link: e.target.value })}
-                      className="text-xs mt-1"
+                      onChange={(url, suggestedText) => {
+                        setBannerForm((prev) => ({
+                          ...prev,
+                          button_link: url,
+                          button_text:
+                            suggestedText &&
+                            (!prev.button_text ||
+                              prev.button_text === 'Shop Now' ||
+                              prev.button_text.startsWith('Shop') ||
+                              prev.button_text.startsWith('Buy'))
+                              ? suggestedText
+                              : prev.button_text,
+                        }));
+                      }}
+                      categories={categories}
+                      products={products}
+                      defaultSuggestedText="Shop Now"
                     />
                   </div>
 
@@ -2913,15 +2932,24 @@ export default function Admin() {
                   </div>
 
                   <div>
-                    <Label htmlFor="banner-sec-btn-link" className="text-xs">
-                      Secondary Button Link
-                    </Label>
-                    <Input
+                    <BannerLinkSelector
                       id="banner-sec-btn-link"
-                      placeholder="/about"
+                      label="Secondary Button Destination"
                       value={bannerForm.secondary_button_link}
-                      onChange={(e) => setBannerForm({ ...bannerForm, secondary_button_link: e.target.value })}
-                      className="text-xs mt-1"
+                      onChange={(url, suggestedText) => {
+                        setBannerForm((prev) => ({
+                          ...prev,
+                          secondary_button_link: url,
+                          secondary_button_text:
+                            suggestedText &&
+                            (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                              ? suggestedText
+                              : prev.secondary_button_text,
+                        }));
+                      }}
+                      categories={categories}
+                      products={products}
+                      defaultSuggestedText="Our Story"
                     />
                   </div>
 
@@ -3797,13 +3825,27 @@ export default function Admin() {
                           />
                         </div>
                         <div>
-                          <Label className="text-[11px] text-muted-foreground">Primary Button Link</Label>
-                          <Input
+                          <BannerLinkSelector
+                            id="edit-banner-primary-link"
+                            label="Primary Button Destination"
                             value={editBannerForm.button_link}
-                            onChange={(e) =>
-                              setEditBannerForm({ ...editBannerForm, button_link: e.target.value })
+                            onChange={(url, suggestedText) =>
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                button_link: url,
+                                button_text:
+                                  suggestedText &&
+                                  (!prev.button_text ||
+                                    prev.button_text === 'Shop Now' ||
+                                    prev.button_text.startsWith('Shop') ||
+                                    prev.button_text.startsWith('Buy'))
+                                    ? suggestedText
+                                    : prev.button_text,
+                              }))
                             }
-                            className="text-xs mt-0.5"
+                            categories={categories}
+                            products={products}
+                            defaultSuggestedText="Shop Now"
                           />
                         </div>
                         <div>
@@ -3820,16 +3862,24 @@ export default function Admin() {
                           />
                         </div>
                         <div>
-                          <Label className="text-[11px] text-muted-foreground">Secondary Button Link</Label>
-                          <Input
+                          <BannerLinkSelector
+                            id="edit-banner-secondary-link"
+                            label="Secondary Button Destination"
                             value={editBannerForm.secondary_button_link}
-                            onChange={(e) =>
-                              setEditBannerForm({
-                                ...editBannerForm,
-                                secondary_button_link: e.target.value,
-                              })
+                            onChange={(url, suggestedText) =>
+                              setEditBannerForm((prev) => ({
+                                ...prev,
+                                secondary_button_link: url,
+                                secondary_button_text:
+                                  suggestedText &&
+                                  (!prev.secondary_button_text || prev.secondary_button_text === 'Our Story')
+                                    ? suggestedText
+                                    : prev.secondary_button_text,
+                              }))
                             }
-                            className="text-xs mt-0.5"
+                            categories={categories}
+                            products={products}
+                            defaultSuggestedText="Our Story"
                           />
                         </div>
                       </div>

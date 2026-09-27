@@ -44,6 +44,105 @@ export type Database = {
         }
         Relationships: []
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean | null
+          max_discount: number | null
+          min_order_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          id?: string
+          is_active?: boolean | null
+          max_discount?: number | null
+          min_order_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean | null
+          max_discount?: number | null
+          min_order_value?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      hero_banners: {
+        Row: {
+          aspect_ratio: string | null
+          badge_text: string | null
+          button_link: string | null
+          button_text: string | null
+          created_at: string
+          height: number | null
+          id: string
+          image_url: string
+          is_active: boolean
+          secondary_button_link: string | null
+          secondary_button_text: string | null
+          show_buttons: boolean
+          sort_order: number
+          subtitle: string | null
+          title: string | null
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          badge_text?: string | null
+          button_link?: string | null
+          button_text?: string | null
+          created_at?: string
+          height?: number | null
+          id: string
+          image_url: string
+          is_active?: boolean
+          secondary_button_link?: string | null
+          secondary_button_text?: string | null
+          show_buttons?: boolean
+          sort_order?: number
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          aspect_ratio?: string | null
+          badge_text?: string | null
+          button_link?: string | null
+          button_text?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          secondary_button_link?: string | null
+          secondary_button_text?: string | null
+          show_buttons?: boolean
+          sort_order?: number
+          subtitle?: string | null
+          title?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string
