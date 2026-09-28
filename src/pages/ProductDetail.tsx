@@ -180,15 +180,15 @@ export default function ProductDetail() {
               transition={{ duration: 0.5 }}
               className="flex justify-center"
             >
-              <div className="w-full max-w-[280px] sm:max-w-[340px] lg:max-w-[400px] rounded-3xl overflow-hidden shadow-elevated border border-border/60 bg-card p-3">
+              <div className="w-full max-w-[280px] sm:max-w-[340px] lg:max-w-[420px] flex items-center justify-center">
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-auto max-h-[350px] sm:max-h-[420px] lg:max-h-[480px] block object-cover rounded-2xl transition-transform duration-500 hover:scale-[1.02]"
+                    className="w-full h-auto max-h-[380px] sm:max-h-[460px] lg:max-h-[520px] block object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-[1.03]"
                   />
                 ) : (
-                  <div className="aspect-square w-full flex items-center justify-center bg-secondary rounded-2xl">
+                  <div className="aspect-square w-full flex items-center justify-center bg-secondary/30 rounded-2xl">
                     <span className="text-8xl font-serif text-muted-foreground/30">
                       {product.name.charAt(0)}
                     </span>
@@ -241,13 +241,13 @@ export default function ProductDetail() {
               {/* Weight / Pack Size Variants */}
               {variants.length > 0 ? (
                 <div className="mb-5 space-y-2.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 flex-wrap">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Select Pack Size
                     </label>
                     {selectedVariant && (
-                      <span className="text-xs font-semibold text-primary">
-                        Selected: <span className="font-bold">{selectedVariant.weight}</span>
+                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                        Selected: {selectedVariant.weight}
                       </span>
                     )}
                   </div>
@@ -262,7 +262,7 @@ export default function ProductDetail() {
                           className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all border ${
                             isSelected
                               ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 font-semibold'
-                              : 'bg-card text-foreground border-border hover:border-primary/40 hover:bg-muted/30 font-medium'
+                              : 'bg-background/40 backdrop-blur-sm text-foreground border-border/80 hover:border-primary/40 hover:bg-background/70 font-medium'
                           }`}
                         >
                           <span className="tracking-tight">{v.weight}</span>
@@ -270,7 +270,7 @@ export default function ProductDetail() {
                             className={`text-xs px-2 py-0.5 rounded-md font-bold ${
                               isSelected
                                 ? 'bg-white/20 text-primary-foreground'
-                                : 'bg-muted text-muted-foreground'
+                                : 'bg-muted/70 text-muted-foreground'
                             }`}
                           >
                             ₹{Math.round(v.price)}
@@ -284,8 +284,8 @@ export default function ProductDetail() {
                 <p className="text-muted-foreground mb-4 font-medium">{product.weight}</p>
               ) : null}
 
-              {/* Price Box */}
-              <div className="bg-card/70 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-border/70 shadow-sm mb-6 flex flex-col gap-1">
+              {/* Price */}
+              <div className="mb-6 flex flex-col gap-1">
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight">
                     ₹{activePrice.toFixed(0)}
@@ -343,7 +343,7 @@ export default function ProductDetail() {
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                    <div className="flex items-center border border-border rounded-xl bg-card">
+                    <div className="flex items-center border border-border/80 rounded-xl bg-background/50 backdrop-blur-sm">
                       <button
                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
                         className="p-3 hover:bg-muted transition-colors rounded-l-xl"
@@ -378,8 +378,8 @@ export default function ProductDetail() {
               {/* Description & Ingredients */}
               <div className="space-y-4 mb-6">
                 {product.description && (
-                  <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-border/60">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
                       <Sparkles className="h-4 w-4 text-primary" />
                       About This Product
                     </h3>
@@ -390,8 +390,8 @@ export default function ProductDetail() {
                 )}
 
                 {product.ingredients && (
-                  <div className="bg-card/60 backdrop-blur-sm rounded-2xl p-4 sm:p-5 border border-border/60">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <div className="pt-3 border-t border-border/40">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
                       <Leaf className="h-3.5 w-3.5 text-emerald-600" />
                       Key Ingredients
                     </h3>
@@ -404,7 +404,7 @@ export default function ProductDetail() {
 
               {/* Features / Highlights */}
               <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4 border-t border-border/60">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 p-2.5 sm:p-3 rounded-xl bg-card/60 border border-border/40">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Truck className="h-4 w-4 text-primary" />
                   </div>
@@ -414,7 +414,7 @@ export default function ProductDetail() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 p-2.5 sm:p-3 rounded-xl bg-card/60 border border-border/40">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Package className="h-4 w-4 text-primary" />
                   </div>
@@ -424,7 +424,7 @@ export default function ProductDetail() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 p-2.5 sm:p-3 rounded-xl bg-card/60 border border-border/40">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2 sm:gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Shield className="h-4 w-4 text-primary" />
                   </div>
