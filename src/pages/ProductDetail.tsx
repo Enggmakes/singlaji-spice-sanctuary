@@ -20,68 +20,16 @@ function PackSizeMarquee({
   selectedVariant: WeightVariant | null;
   onSelect: (variant: WeightVariant) => void;
 }) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const isPausedRef = React.useRef(false);
-  const resumeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
   // If variants > 3, duplicate list for seamless infinite loop
   const shouldLoop = variants.length > 3;
   const items = shouldLoop ? [...variants, ...variants] : variants;
 
-  React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !shouldLoop) return;
-
-    let animId: number;
-    let scrollPos = el.scrollLeft;
-    const speed = 0.35; // gentle, steady glide
-
-    const step = () => {
-      if (!isPausedRef.current && el) {
-        scrollPos += speed;
-        // Seamless infinite loop: when reaching half, rewind by half
-        if (scrollPos >= el.scrollWidth / 2) {
-          scrollPos -= el.scrollWidth / 2;
-        }
-        el.scrollLeft = scrollPos;
-      } else if (el) {
-        // Keep internal float in sync with manual user touch scrolling!
-        scrollPos = el.scrollLeft;
-      }
-      animId = requestAnimationFrame(step);
-    };
-
-    animId = requestAnimationFrame(step);
-
-    return () => {
-      cancelAnimationFrame(animId);
-      if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-    };
-  }, [shouldLoop, variants.length]);
-
-  const handlePause = () => {
-    isPausedRef.current = true;
-    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-  };
-
-  const handleResume = () => {
-    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-    resumeTimeoutRef.current = setTimeout(() => {
-      isPausedRef.current = false;
-    }, 2000); // 2s pause before resuming
-  };
-
   return (
-    <div
-      className="relative -mx-4 sm:mx-0 overflow-hidden py-1"
-      onMouseEnter={handlePause}
-      onMouseLeave={handleResume}
-      onTouchStart={handlePause}
-      onTouchEnd={handleResume}
-    >
+    <div className="relative -mx-4 sm:mx-0 overflow-hidden py-1 w-full max-w-full">
       <div
-        ref={containerRef}
-        className="flex items-center gap-2.5 overflow-x-auto select-none cursor-grab active:cursor-grabbing [touch-action:pan-x] [overscroll-behavior-x:contain] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4 sm:px-0 py-0.5"
+        className={`${
+          shouldLoop ? 'animate-marquee-butter' : 'flex flex-wrap'
+        } items-center gap-2.5 px-4 sm:px-0 py-0.5 select-none`}
       >
         {items.map((v, idx) => {
           const isSelected = selectedVariant?.weight === v.weight;
@@ -89,15 +37,11 @@ function PackSizeMarquee({
             <button
               key={`${v.weight}-${idx}`}
               type="button"
-              onClick={() => {
-                onSelect(v);
-                handlePause();
-                handleResume();
-              }}
-              className={`shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm transition-all border ${
+              onClick={() => onSelect(v)}
+              className={`shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm transition-all border cursor-pointer ${
                 isSelected
-                  ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 font-semibold'
-                  : 'bg-card/70 backdrop-blur-sm text-foreground border-border hover:border-primary/40 hover:bg-card font-medium'
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 font-semibold scale-[1.02]'
+                  : 'bg-card/80 backdrop-blur-sm text-foreground border-border hover:border-primary/50 hover:bg-card font-medium'
               }`}
             >
               <span className="whitespace-nowrap tracking-tight font-semibold">{v.weight}</span>
@@ -397,7 +341,7 @@ export default function ProductDetail() {
               </div>
 
               {/* Quantity & Add to Cart (Desktop only: hidden on mobile where Blinkit sticky bottom bar handles it) */}
-              <div className="hidden md:flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="hidden md:flex items-center gap-4 mb-6">
                 {cartQuantity > 0 ? (
                   <div className="flex items-center gap-3">
                     <div className="flex items-center bg-primary text-primary-foreground rounded-xl shadow-sm border border-primary/20 overflow-hidden font-bold">
@@ -427,36 +371,15 @@ export default function ProductDetail() {
                     </span>
                   </div>
                 ) : (
-                  <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                    <div className="flex items-center border border-border/80 rounded-xl bg-background/50 backdrop-blur-sm">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="p-3 hover:bg-muted transition-colors rounded-l-xl"
-                        disabled={quantity <= 1}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <span className="px-6 text-lg font-medium min-w-[4rem] text-center">
-                        {quantity}
-                      </span>
-                      <button
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="p-3 hover:bg-muted transition-colors rounded-r-xl"
-                        disabled={quantity >= product.stock}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <Button
-                      onClick={handleAddToCart}
-                      size="lg"
-                      className="flex-1 sm:flex-none sm:min-w-[200px] rounded-xl font-bold shadow-md"
-                      disabled={product.stock === 0}
-                    >
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      Add to Cart
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={handleQuickAdd}
+                    size="lg"
+                    className="min-w-[200px] h-12 text-base rounded-xl font-bold shadow-md hover:scale-[1.01] active:scale-[0.99] transition-all"
+                    disabled={product.stock === 0}
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Add to Cart
+                  </Button>
                 )}
               </div>
 

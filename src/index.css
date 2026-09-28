@@ -183,4 +183,27 @@
   .shadow-elevated {
     box-shadow: var(--shadow-elevated);
   }
+
+  /* GPU-Accelerated Butter-Smooth Marquee */
+  @keyframes marquee-glide {
+    0% {
+      transform: translate3d(0, 0, 0);
+    }
+    100% {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+
+  .animate-marquee-butter {
+    display: flex;
+    width: max-content;
+    will-change: transform;
+    animation: marquee-glide 28s linear infinite;
+  }
+
+  .animate-marquee-butter:hover,
+  .animate-marquee-butter:active,
+  .animate-marquee-butter:focus-within {
+    animation-play-state: paused !important;
+  }
 }
