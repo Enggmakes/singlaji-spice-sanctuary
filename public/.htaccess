@@ -1,6 +1,15 @@
+<Files "config.php">
+  Order allow,deny
+  Deny from all
+</Files>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Cashfree API routing
+  RewriteRule ^api/cashfree/create-order$ /api/cashfree.php?action=create-order [L,QSA]
+  RewriteRule ^api/cashfree/verify-order$ /api/cashfree.php?action=verify-order [L,QSA]
 
   # 1. Direct social media crawlers (WhatsApp, Facebook, Twitter, Telegram, LinkedIn, Discord) to dynamic OpenGraph generator
   RewriteCond %{HTTP_USER_AGENT} (facebookexternalhit|WhatsApp|Facebot|Twitterbot|TelegramBot|LinkedInBot|Discordbot) [NC]
@@ -14,3 +23,4 @@
   RewriteCond %{REQUEST_FILENAME} !-l
   RewriteRule . /index.html [L]
 </IfModule>
+

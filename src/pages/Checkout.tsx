@@ -25,6 +25,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { lookupPincode } from '@/lib/pincodeLookup';
+import {
+  createCashfreeOrder,
+  verifyCashfreeOrder,
+  openCashfreeCheckout,
+} from '@/lib/cashfreeService';
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -65,7 +70,7 @@ export default function Checkout() {
     city: '',
     state: 'Punjab',
     pincode: '',
-    paymentMethod: 'cod',
+    paymentMethod: 'online',
     notes: '',
   });
 
@@ -194,6 +199,44 @@ export default function Checkout() {
               return v.toString(16);
             });
 
+      // Handle Cashfree Online Payment Flow
+      if (formData.paymentMethod === 'online') {
+        const cfOrderId = `CF_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+        toast.info('Opening Cashfree Secure Checkout...');
+        const cfOrder = await createCashfreeOrder({
+          orderId: cfOrderId,
+          orderAmount: finalTotal,
+          customerName: formData.name,
+          customerEmail: formData.email || user.email || 'customer@singlaji.in',
+          customerPhone: formData.phone,
+          customerId: user.id,
+        });
+
+        if (!cfOrder.payment_session_id) {
+          throw new Error(cfOrder.message || 'Unable to start payment session. Please try again.');
+        }
+
+        // Open Cashfree Web Checkout Modal
+        const checkoutResult = await openCashfreeCheckout(cfOrder.payment_session_id);
+
+        if (!checkoutResult.success) {
+          toast.error(checkoutResult.error || 'Payment was cancelled or closed.');
+          setLoading(false);
+          return;
+        }
+
+        // Verify transaction with backend Cashfree API
+        toast.info('Verifying payment confirmation...');
+        const verification = await verifyCashfreeOrder(cfOrderId);
+
+        if (verification.order_status !== 'PAID' && verification.order_status !== 'ACTIVE') {
+          throw new Error(`Payment verification returned status: ${verification.order_status}`);
+        }
+
+        orderNotes = `${orderNotes ? orderNotes + ' ' : ''}[Cashfree ID: ${cfOrderId}] [Status: ${verification.order_status}]`;
+      }
+
       // Create order tied permanently to user.id
       const { error: orderError } = await supabase
         .from('orders')
@@ -207,7 +250,7 @@ export default function Checkout() {
           city: formData.city,
           state: formData.state,
           pincode: formData.pincode,
-          payment_method: formData.paymentMethod,
+          payment_method: formData.paymentMethod === 'online' ? 'Online (Cashfree)' : formData.paymentMethod,
           status: 'pending',
           subtotal,
           shipping,
@@ -256,7 +299,11 @@ export default function Checkout() {
       setOrderId(newOrderId);
       setOrderPlaced(true);
       clearCart();
-      toast.success('Order placed successfully!');
+      toast.success(
+        formData.paymentMethod === 'online'
+          ? 'Payment successful! Order placed.'
+          : 'Order placed successfully!'
+      );
     } catch (error: any) {
       console.error('Error placing order:', error);
       const errorMsg = error?.message || 'Failed to place order. Please try again.';
@@ -569,9 +616,14 @@ export default function Checkout() {
 
               {/* Payment Method */}
               <div className="bg-card rounded-xl p-6 shadow-card border border-border space-y-4">
-                <h2 className="font-serif font-semibold text-lg border-b border-border pb-3">
-                  Payment Option
-                </h2>
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <h2 className="font-serif font-semibold text-lg">
+                    Payment Option
+                  </h2>
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <ShieldCheck className="h-3.5 w-3.5 text-primary" /> 100% Secure Checkout
+                  </span>
+                </div>
 
                 <RadioGroup
                   value={formData.paymentMethod}
@@ -580,35 +632,65 @@ export default function Checkout() {
                   }
                   className="space-y-3"
                 >
-                  <div className="flex items-center space-x-3 p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
-                    <RadioGroupItem value="cod" id="cod" />
-                    <Label htmlFor="cod" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">Cash on Delivery (COD)</p>
-                          <p className="text-xs text-muted-foreground">
-                            Pay in cash or UPI to the delivery person
-                          </p>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
+                  {/* Cashfree Online Payment Option */}
+                  <label
+                    htmlFor="pm-online"
+                    className={`flex items-center space-x-3 p-4 border rounded-xl transition-all cursor-pointer ${
+                      formData.paymentMethod === 'online'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border hover:bg-muted/30'
+                    }`}
+                  >
+                    <RadioGroupItem value="online" id="pm-online" />
+                    <div className="flex items-center gap-3 flex-1 select-none pointer-events-none">
+                      <CreditCard className="h-5 w-5 text-primary" />
+                      <p className="font-medium text-foreground">
+                        Online Payment (UPI, Cards, NetBanking)
+                      </p>
+                    </div>
+                  </label>
 
-                  <div className="flex items-center space-x-3 p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer">
-                    <RadioGroupItem value="whatsapp" id="whatsapp" />
-                    <Label htmlFor="whatsapp" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <MessageCircle className="h-5 w-5 text-emerald-600" />
-                        <div>
-                          <p className="font-medium">Order via WhatsApp</p>
-                          <p className="text-xs text-muted-foreground">
-                            Confirm order directly with Singlaji Store via WhatsApp
-                          </p>
-                        </div>
+                  {/* Cash on Delivery */}
+                  <label
+                    htmlFor="pm-cod"
+                    className={`flex items-center space-x-3 p-4 border rounded-xl transition-all cursor-pointer ${
+                      formData.paymentMethod === 'cod'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'border-border hover:bg-muted/30'
+                    }`}
+                  >
+                    <RadioGroupItem value="cod" id="pm-cod" />
+                    <div className="flex items-center gap-3 flex-1 select-none pointer-events-none">
+                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Cash on Delivery (COD)</p>
+                        <p className="text-xs text-muted-foreground">
+                          Pay in cash or UPI to the delivery courier
+                        </p>
                       </div>
-                    </Label>
-                  </div>
+                    </div>
+                  </label>
+
+                  {/* WhatsApp Order */}
+                  <label
+                    htmlFor="pm-whatsapp"
+                    className={`flex items-center space-x-3 p-4 border rounded-xl transition-all cursor-pointer ${
+                      formData.paymentMethod === 'whatsapp'
+                        ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 ring-1 ring-emerald-600'
+                        : 'border-border hover:bg-muted/30'
+                    }`}
+                  >
+                    <RadioGroupItem value="whatsapp" id="pm-whatsapp" />
+                    <div className="flex items-center gap-3 flex-1 select-none pointer-events-none">
+                      <MessageCircle className="h-5 w-5 text-emerald-600" />
+                      <div>
+                        <p className="font-medium">Order via WhatsApp</p>
+                        <p className="text-xs text-muted-foreground">
+                          Confirm order directly with Singlaji Store via WhatsApp
+                        </p>
+                      </div>
+                    </div>
+                  </label>
                 </RadioGroup>
               </div>
 
@@ -637,6 +719,18 @@ export default function Checkout() {
                   >
                     <MessageCircle className="mr-2 h-5 w-5" />
                     Send Order on WhatsApp (₹{finalTotal.toFixed(0)})
+                  </Button>
+                ) : formData.paymentMethod === 'online' ? (
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+                    disabled={loading}
+                  >
+                    <ShieldCheck className="mr-2 h-5 w-5" />
+                    {loading
+                      ? 'Opening Secure Checkout...'
+                      : `Pay & Place Order • ₹${finalTotal.toFixed(0)}`}
                   </Button>
                 ) : (
                   <Button
