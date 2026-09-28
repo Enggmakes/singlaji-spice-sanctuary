@@ -33,15 +33,20 @@ function PackSizeMarquee({
     if (!el || !shouldLoop) return;
 
     let animId: number;
-    const speed = 0.2; // ultra-slow, gentle glide
+    let scrollPos = el.scrollLeft;
+    const speed = 0.35; // gentle, steady glide
 
     const step = () => {
       if (!isPausedRef.current && el) {
-        el.scrollLeft += speed;
+        scrollPos += speed;
         // Seamless infinite loop: when reaching half, rewind by half
-        if (el.scrollLeft >= el.scrollWidth / 2) {
-          el.scrollLeft -= el.scrollWidth / 2;
+        if (scrollPos >= el.scrollWidth / 2) {
+          scrollPos -= el.scrollWidth / 2;
         }
+        el.scrollLeft = scrollPos;
+      } else if (el) {
+        // Keep internal float in sync with manual user touch scrolling!
+        scrollPos = el.scrollLeft;
       }
       animId = requestAnimationFrame(step);
     };
