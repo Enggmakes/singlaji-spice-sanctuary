@@ -8,6 +8,8 @@ import {
   Percent,
   Check,
   Ban,
+  Smartphone,
+  Monitor,
   Truck,
   Package,
   Search,
@@ -74,6 +76,7 @@ import {
 } from '@/lib/weightVariants';
 import { toast } from 'sonner';
 import BannerLinkSelector from '@/components/admin/BannerLinkSelector';
+import { getCategoryVectorIcon } from '@/components/icons/SpiceCategoryIcons';
 
 interface Category {
   id: string;
@@ -583,6 +586,8 @@ export default function Admin() {
 
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [bannerImagePreview, setBannerImagePreview] = useState<string | null>(null);
+  const [bannerMobileImageFile, setBannerMobileImageFile] = useState<File | null>(null);
+  const [bannerMobileImagePreview, setBannerMobileImagePreview] = useState<string | null>(null);
   const [bannerValidationState, setBannerValidationState] = useState<{
     isValid: boolean;
     width?: number;
@@ -664,6 +669,10 @@ export default function Admin() {
     current_image_url: string;
     new_image_file: File | null;
     new_image_preview: string | null;
+    current_mobile_image_url?: string;
+    new_mobile_image_file: File | null;
+    new_mobile_image_preview: string | null;
+    remove_mobile_image: boolean;
   }>({
     id: '',
     title: '',
@@ -680,6 +689,10 @@ export default function Admin() {
     current_image_url: '',
     new_image_file: null,
     new_image_preview: null,
+    current_mobile_image_url: '',
+    new_mobile_image_file: null,
+    new_mobile_image_preview: null,
+    remove_mobile_image: false,
   });
 
   // Lock body scroll and guarantee full screen coverage when modal popup is open
@@ -1390,6 +1403,30 @@ export default function Admin() {
     });
   };
 
+  const handleBannerMobileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (JPEG, PNG, WebP)');
+      return;
+    }
+
+    setBannerMobileImageFile(file);
+    setBannerMobileImagePreview(URL.createObjectURL(file));
+    toast.success('Smartphone / Mobile Banner Selected!', {
+      description: 'Optimized for mobile screens without side-cropping.',
+    });
+  };
+
+  const handleRemoveBannerMobileImage = () => {
+    setBannerMobileImageFile(null);
+    setBannerMobileImagePreview(null);
+    const input = document.getElementById('hero-banner-mobile-image-input') as HTMLInputElement;
+    if (input) input.value = '';
+    toast.info('Mobile banner removed. Storefront will use desktop banner.');
+  };
+
   const handleCreateBanner = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -1438,12 +1475,38 @@ export default function Admin() {
         });
       }
 
+      // 4. Upload optional Mobile Smartphone Banner if provided
+      let finalMobileImageUrl: string | undefined = undefined;
+      if (bannerMobileImageFile) {
+        try {
+          const compMobile = await compressImage(bannerMobileImageFile, { maxWidth: 1080, maxHeight: 1440, quality: 0.85 });
+          const mobileFileToUpload = compMobile.file;
+          const cleanMobileFileName = `banner-mobile-${Date.now()}-${mobileFileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(`banners/${cleanMobileFileName}`, mobileFileToUpload, { upsert: true });
+
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(`banners/${cleanMobileFileName}`);
+            finalMobileImageUrl = publicUrl;
+          }
+          if (!finalMobileImageUrl) {
+            finalMobileImageUrl = compMobile.dataUrl;
+          }
+        } catch (mobileErr) {
+          console.warn('Mobile banner upload fallback:', mobileErr);
+        }
+      }
+
       const isNone = bannerForm.button_link === 'none';
       await createHeroBanner({
         image_url: finalImageUrl,
-        title: bannerForm.hide_overlay || isNone ? undefined : bannerForm.title.trim() || undefined,
-        subtitle: bannerForm.hide_overlay || isNone ? undefined : bannerForm.subtitle.trim() || undefined,
-        badge_text: bannerForm.hide_overlay || isNone ? undefined : bannerForm.badge_text.trim() || undefined,
+        mobile_image_url: finalMobileImageUrl || null,
+        title: bannerForm.hide_overlay || isNone ? null : (bannerForm.title.trim() || null),
+        subtitle: bannerForm.hide_overlay || isNone ? null : (bannerForm.subtitle.trim() || null),
+        badge_text: bannerForm.hide_overlay || isNone ? null : (bannerForm.badge_text.trim() || null),
         button_text: isNone || !bannerForm.show_buttons ? '' : (bannerForm.button_text.trim() || 'Shop Now'),
         button_link: isNone ? 'none' : (bannerForm.button_link?.trim() || '/products'),
         secondary_button_text: isNone || !bannerForm.show_buttons ? '' : (bannerForm.secondary_button_text.trim() || 'Our Story'),
@@ -1457,7 +1520,7 @@ export default function Admin() {
         height: bannerValidationState.height,
       });
 
-      toast.success('2.4:1 Hero Banner Added Successfully!');
+      toast.success('Hero Banner Added Successfully!');
 
       // Reset form with default buttons
       setBannerForm({
@@ -1475,11 +1538,15 @@ export default function Admin() {
       });
       setBannerImageFile(null);
       setBannerImagePreview(null);
+      setBannerMobileImageFile(null);
+      setBannerMobileImagePreview(null);
       setBannerValidationState({ isValid: false });
 
-      // Reset file input element
+      // Reset file input elements
       const fileInput = document.getElementById('hero-banner-image-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
+      const mobileFileInput = document.getElementById('hero-banner-mobile-image-input') as HTMLInputElement;
+      if (mobileFileInput) mobileFileInput.value = '';
 
       await loadBanners();
       broadcastStoreUpdate('hero_banners_changed');
@@ -1560,6 +1627,10 @@ export default function Admin() {
       current_image_url: banner.image_url,
       new_image_file: null,
       new_image_preview: null,
+      current_mobile_image_url: banner.mobile_image_url || '',
+      new_mobile_image_file: null,
+      new_mobile_image_preview: null,
+      remove_mobile_image: false,
     });
   };
 
@@ -1583,6 +1654,24 @@ export default function Admin() {
       new_image_preview: URL.createObjectURL(file),
     }));
     toast.success('2.4:1 (21:9) Aspect Ratio Verified!');
+  };
+
+  const handleEditBannerMobileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (JPEG, PNG, WebP)');
+      return;
+    }
+
+    setEditBannerForm((prev) => ({
+      ...prev,
+      new_mobile_image_file: file,
+      new_mobile_image_preview: URL.createObjectURL(file),
+      remove_mobile_image: false,
+    }));
+    toast.success('New Mobile Banner Selected!');
   };
 
   const handleSaveBannerEdit = async (e: React.FormEvent) => {
@@ -1621,16 +1710,45 @@ export default function Admin() {
         }
       }
 
+      // Handle mobile image updates
+      let finalMobileImageUrl: string | undefined = editBannerForm.remove_mobile_image
+        ? undefined
+        : (editBannerForm.current_mobile_image_url || undefined);
+
+      if (editBannerForm.new_mobile_image_file) {
+        try {
+          const compMobile = await compressImage(editBannerForm.new_mobile_image_file, { maxWidth: 1080, maxHeight: 1440, quality: 0.85 });
+          const mobileFileToUpload = compMobile.file;
+          const cleanMobileFileName = `banner-mobile-${Date.now()}-${mobileFileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(`banners/${cleanMobileFileName}`, mobileFileToUpload, { upsert: true });
+
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(`banners/${cleanMobileFileName}`);
+            finalMobileImageUrl = publicUrl;
+          }
+          if (!finalMobileImageUrl) {
+            finalMobileImageUrl = compMobile.dataUrl;
+          }
+        } catch (mobileErr) {
+          console.warn('Mobile banner edit upload fallback:', mobileErr);
+        }
+      }
+
       const isNone = editBannerForm.button_link === 'none';
       await updateHeroBanner(editingBanner.id, {
         image_url: finalImageUrl,
-        title: editBannerForm.hide_overlay || isNone ? undefined : editBannerForm.title.trim() || undefined,
-        subtitle: editBannerForm.hide_overlay || isNone ? undefined : editBannerForm.subtitle.trim() || undefined,
-        badge_text: editBannerForm.hide_overlay || isNone ? undefined : editBannerForm.badge_text.trim() || undefined,
-        button_text: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.button_text.trim() || 'Shop Now'),
+        mobile_image_url: editBannerForm.remove_mobile_image ? null : (finalMobileImageUrl || null),
+        title: editBannerForm.hide_overlay || isNone ? null : (editBannerForm.title?.trim() || null),
+        subtitle: editBannerForm.hide_overlay || isNone ? null : (editBannerForm.subtitle?.trim() || null),
+        badge_text: editBannerForm.hide_overlay || isNone ? null : (editBannerForm.badge_text?.trim() || null),
+        button_text: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.button_text?.trim() || 'Shop Now'),
         button_link: isNone ? 'none' : (editBannerForm.button_link?.trim() || '/products'),
-        secondary_button_text: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.secondary_button_text.trim() || 'Our Story'),
-        secondary_button_link: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.secondary_button_link.trim() || ''),
+        secondary_button_text: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.secondary_button_text?.trim() || 'Our Story'),
+        secondary_button_link: isNone || !editBannerForm.show_buttons ? '' : (editBannerForm.secondary_button_link?.trim() || ''),
         show_buttons: isNone ? false : (editBannerForm.show_buttons !== false),
         hide_overlay: isNone ? true : Boolean(editBannerForm.hide_overlay),
         sort_order: Number(editBannerForm.sort_order) || 1,
@@ -2505,37 +2623,73 @@ export default function Admin() {
         {/* TAB 4: CATEGORIES */}
         {/* ============================================================== */}
         {activeTab === 'categories' && (
-          <section className="bg-card rounded-xl p-6 shadow-card border border-border space-y-6">
-            <h2 className="text-xl font-semibold font-serif">Manage Spice Categories</h2>
-            <div className="flex gap-3 max-w-md">
-              <Input
-                placeholder="New category name (e.g. Whole Spices)"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddCategory();
-                  }
-                }}
-              />
-              <Button
-                onClick={handleAddCategory}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add
-              </Button>
+          <section className="bg-card rounded-2xl p-6 shadow-card border border-border space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold font-serif">Manage Spice Categories</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Categories automatically search and pair with matching Flaticon flat-vector icons for the storefront carousel and navigation.
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {categories.map((cat) => (
-                <span
-                  key={cat.id}
-                  className="px-3.5 py-1.5 text-xs font-semibold rounded-full bg-muted border border-border text-foreground"
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 max-w-lg">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="New category name (e.g. Cinnamon, Black Pepper, Coriander...)"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCategory();
+                      }
+                    }}
+                    className="pr-12 text-sm h-11 rounded-xl"
+                  />
+                  {newCategoryName.trim() && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center p-1 pointer-events-none">
+                      {getCategoryVectorIcon(newCategoryName, 'w-full h-full')}
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  onClick={handleAddCategory}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 h-11 px-5 rounded-xl font-medium"
                 >
-                  {cat.name}
-                </span>
-              ))}
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
+              </div>
+
+              {newCategoryName.trim() && (
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground pl-1">
+                  <span>Auto-matched vector icon:</span>
+                  <span className="font-semibold text-foreground flex items-center gap-1.5 bg-muted/60 px-2 py-0.5 rounded-md">
+                    <span className="w-4 h-4 shrink-0 inline-block">{getCategoryVectorIcon(newCategoryName, 'w-full h-full')}</span>
+                    {newCategoryName}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border/70">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Active Categories ({categories.length})
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {categories.map((cat) => (
+                  <span
+                    key={cat.id}
+                    className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-muted/40 border border-border/70 text-foreground flex items-center gap-2.5 shadow-2xs hover:border-primary/40 transition-colors"
+                  >
+                    <span className="w-6 h-6 rounded-lg bg-background border border-border/50 flex items-center justify-center shrink-0 p-1">
+                      {getCategoryVectorIcon(cat.name, 'w-full h-full')}
+                    </span>
+                    <span className="capitalize font-medium">{cat.name}</span>
+                  </span>
+                ))}
+              </div>
             </div>
           </section>
         )}
@@ -2694,6 +2848,94 @@ export default function Admin() {
                           <p className="text-xs">No image selected</p>
                           <p className="text-[10px] opacity-70">
                             2.4:1 preview will appear here once a valid 2.4:1 / 21:9 file is selected
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Smartphone / Mobile Banner Graphic (Optional) */}
+                <div className="pt-4 border-t border-border space-y-2">
+                  <div className="flex items-center justify-between min-h-[22px]">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-primary" />
+                      <span>Smartphone / Mobile Banner Graphic</span>
+                      <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                        (Optional • Recommended for Phones to prevent side-cutting)
+                      </span>
+                    </Label>
+                    {bannerMobileImagePreview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveBannerMobileImage}
+                        className="h-6 text-[11px] text-destructive hover:bg-destructive/10 px-2"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" /> Remove Mobile Image
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+                    {/* Left: Mobile Dropzone */}
+                    <div className="w-full aspect-[2.4/1] border-2 border-dashed border-border rounded-xl hover:border-primary/50 transition-colors bg-muted/20 relative flex flex-col items-center justify-center text-center p-3">
+                      <input
+                        id="hero-banner-mobile-image-input"
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        onChange={handleBannerMobileImageSelect}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="hero-banner-mobile-image-input"
+                        className="cursor-pointer inline-flex flex-col items-center justify-center gap-1.5"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                          <Upload className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs sm:text-sm font-semibold text-primary hover:underline">
+                            {bannerMobileImageFile ? 'Click to change mobile image' : 'Select Mobile Banner (4:3, 1:1, or Portrait)'}
+                          </span>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Recommended: 1080×1080, 1080×1350, or 800×600 • Zero side-cropping on phones!
+                          </p>
+                        </div>
+                      </label>
+
+                      {bannerMobileImageFile && (
+                        <div className="absolute bottom-2 inset-x-2 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-[11px] font-medium flex items-center justify-between backdrop-blur-sm">
+                          <span className="flex items-center gap-1 truncate">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="truncate">{bannerMobileImageFile.name}</span>
+                          </span>
+                          <span className="text-[10px] opacity-80 shrink-0 font-mono">Mobile Ready</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Mobile Live Preview */}
+                    <div className="w-full aspect-[2.4/1] rounded-xl border border-border bg-stone-900 relative overflow-hidden flex items-center justify-center shadow-inner group">
+                      {bannerMobileImagePreview ? (
+                        <>
+                          <img
+                            src={bannerMobileImagePreview}
+                            alt="Mobile Banner Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20 flex items-center gap-1">
+                            <Smartphone className="w-3 h-3 text-white" />
+                            <span>Smartphone Preview</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center p-4 text-muted-foreground space-y-1">
+                          <Smartphone className="w-5 h-5 mx-auto opacity-40" />
+                          <p className="text-xs">No mobile-specific graphic selected</p>
+                          <p className="text-[10px] opacity-70">
+                            If skipped, smartphones will display the desktop 2.4:1 banner.
                           </p>
                         </div>
                       )}
@@ -2974,6 +3216,18 @@ export default function Admin() {
                             >
                               {b.is_active ? 'Active' : 'Inactive'}
                             </span>
+
+                            {b.mobile_image_url ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 flex items-center gap-1">
+                                <Smartphone className="w-3 h-3" />
+                                <span>Mobile Banner Set</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] text-muted-foreground bg-muted flex items-center gap-1">
+                                <Monitor className="w-3 h-3" />
+                                <span>Desktop Auto-fit</span>
+                              </span>
+                            )}
                           </div>
 
                           {b.subtitle && (
@@ -2990,7 +3244,7 @@ export default function Admin() {
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium italic">
-                                🚫 No Link (Display Only)
+                                <Ban className="w-3 h-3" /> No Link (Display Only)
                               </span>
                             )}
                             {b.badge_text && (
@@ -3615,6 +3869,90 @@ export default function Admin() {
                       <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         New 2.4:1 Image selected: {editBannerForm.new_image_file.name}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Smartphone / Mobile Banner Graphic in Edit Modal */}
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Smartphone className="w-3.5 h-3.5 text-primary" />
+                        <span>Smartphone / Mobile Banner Graphic</span>
+                        <span className="text-[10px] font-normal text-muted-foreground ml-1">(Optional)</span>
+                      </Label>
+                      {(editBannerForm.new_mobile_image_preview || (editBannerForm.current_mobile_image_url && !editBannerForm.remove_mobile_image)) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditBannerForm((prev) => ({
+                              ...prev,
+                              new_mobile_image_file: null,
+                              new_mobile_image_preview: null,
+                              remove_mobile_image: true,
+                            }));
+                          }}
+                          className="text-[11px] text-destructive hover:underline flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" /> Remove Mobile Image
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative aspect-[2.4/1] w-full rounded-xl overflow-hidden border border-border bg-stone-900 shadow-inner group flex items-center justify-center">
+                      {(editBannerForm.new_mobile_image_preview || (editBannerForm.current_mobile_image_url && !editBannerForm.remove_mobile_image)) ? (
+                        <>
+                          <img
+                            src={editBannerForm.new_mobile_image_preview || editBannerForm.current_mobile_image_url}
+                            alt="Mobile Banner Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white font-mono backdrop-blur-sm border border-white/20 flex items-center gap-1">
+                            <Smartphone className="w-3 h-3 text-white" />
+                            <span>Smartphone Banner</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center p-4 text-muted-foreground space-y-1">
+                          <Smartphone className="w-5 h-5 mx-auto opacity-40" />
+                          <p className="text-xs">No mobile-specific graphic</p>
+                          <p className="text-[10px] opacity-70">
+                            Smartphones will automatically display the desktop banner.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end p-3.5">
+                        <label
+                          htmlFor="edit-hero-banner-mobile-image"
+                          className="cursor-pointer px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 text-white text-xs font-medium backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all shadow-md"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          {editBannerForm.new_mobile_image_file
+                            ? 'Change Selected Mobile Image'
+                            : (editBannerForm.current_mobile_image_url && !editBannerForm.remove_mobile_image)
+                            ? 'Replace Mobile Image'
+                            : 'Upload Mobile Image (4:3 / 1:1)'}
+                        </label>
+                        <input
+                          id="edit-hero-banner-mobile-image"
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleEditBannerMobileImageSelect}
+                          className="hidden"
+                        />
+                      </div>
+                    </div>
+
+                    {editBannerForm.new_mobile_image_file && (
+                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        New Mobile Image selected: {editBannerForm.new_mobile_image_file.name}
+                      </div>
+                    )}
+                    {editBannerForm.remove_mobile_image && (
+                      <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                        Mobile graphic will be removed on save (desktop banner will be used on phones).
                       </div>
                     )}
                   </div>

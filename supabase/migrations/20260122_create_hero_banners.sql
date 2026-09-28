@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS public.hero_banners (
     id TEXT PRIMARY KEY DEFAULT ('banner-' || floor(extract(epoch from now()) * 1000)::text),
     image_url TEXT NOT NULL,
+    mobile_image_url TEXT,
     badge_text TEXT,
     title TEXT,
     subtitle TEXT,
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.hero_banners (
 
 -- Ensure column exists if table was already created
 ALTER TABLE public.hero_banners ADD COLUMN IF NOT EXISTS hide_overlay BOOLEAN DEFAULT false;
+ALTER TABLE public.hero_banners ADD COLUMN IF NOT EXISTS mobile_image_url TEXT;
 
 -- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.hero_banners ENABLE ROW LEVEL SECURITY;

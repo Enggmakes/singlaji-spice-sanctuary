@@ -4,11 +4,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HeroBanner } from '@/types/banner';
-import { fetchHeroBanners, DEFAULT_BANNERS } from '@/lib/bannerService';
+import { fetchHeroBanners, getLocalBanners } from '@/lib/bannerService';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function HeroBannerSlider() {
-  const [banners, setBanners] = useState<HeroBanner[]>(DEFAULT_BANNERS);
+  const [banners, setBanners] = useState<HeroBanner[]>(() => {
+    try {
+      const local = getLocalBanners();
+      const active = (local || []).filter((b) => b.is_active && b.id !== 'default-hero-1');
+      if (active.length > 0) return active;
+    } catch {}
+    return [];
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [isPaused, setIsPaused] = useState(false);
@@ -19,12 +26,11 @@ export default function HeroBannerSlider() {
     try {
       const activeBanners = await fetchHeroBanners(true);
       if (activeBanners && activeBanners.length > 0) {
-        setBanners(activeBanners);
-      } else {
-        setBanners(DEFAULT_BANNERS);
+        const customOnly = activeBanners.filter((b) => b.id !== 'default-hero-1');
+        setBanners(customOnly.length > 0 ? customOnly : activeBanners);
       }
-    } catch {
-      setBanners(DEFAULT_BANNERS);
+    } catch (err) {
+      console.warn('Failed to load hero banners:', err);
     }
   }, []);
 
@@ -116,7 +122,13 @@ export default function HeroBannerSlider() {
     setTouchEndX(null);
   };
 
-  const currentBanner = banners[currentIndex] || banners[0] || DEFAULT_BANNERS[0];
+  if (!banners || banners.length === 0) {
+    return (
+      <section className="relative w-full max-w-[1920px] mx-auto aspect-[2.4/1] bg-stone-900/40" />
+    );
+  }
+
+  const currentBanner = banners[currentIndex] || banners[0];
   const rawPrimaryLink = (currentBanner.button_link || '').trim();
   const isNoLink = !rawPrimaryLink || rawPrimaryLink === 'none' || rawPrimaryLink === '#';
   const isCleanGraphicMode = currentBanner.hide_overlay === true || isNoLink || (!currentBanner.title?.trim() && !currentBanner.subtitle?.trim() && !currentBanner.badge_text?.trim() && currentBanner.show_buttons === false);
@@ -144,9 +156,15 @@ export default function HeroBannerSlider() {
     }),
   };
 
+  const hasMobileImage = Boolean(currentBanner.mobile_image_url);
+
   return (
     <section
-      className="relative w-full max-w-[1920px] mx-auto aspect-[2.4/1] overflow-hidden select-none bg-stone-900 group"
+      className={`relative w-full max-w-[1920px] mx-auto overflow-hidden select-none bg-stone-900 group transition-[aspect-ratio] duration-300 ${
+        hasMobileImage
+          ? 'aspect-[4/3] sm:aspect-[16/10] md:aspect-[2/1] lg:aspect-[2.4/1]'
+          : 'aspect-[2.4/1]'
+      }`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -168,18 +186,32 @@ export default function HeroBannerSlider() {
           }}
           className="absolute inset-0 w-full h-full"
         >
-          {/* Background Image Container strictly in 2.4:1 (21:9) */}
+          {/* Background Image Container with Mobile Picture Support */}
           <div className="relative w-full h-full">
-            <img
-              src={currentBanner.image_url}
-              alt={currentBanner.title || 'Singlaji Spices Promotional Banner'}
-              className="w-full h-full object-cover object-center"
-              loading="eager"
-            />
+            <picture className="w-full h-full block">
+              {currentBanner.mobile_image_url && (
+                <source
+                  media="(max-width: 767px)"
+                  srcSet={currentBanner.mobile_image_url}
+                />
+              )}
+              <img
+                src={currentBanner.image_url}
+                alt={currentBanner.title || 'Singlaji Spices Promotional Banner'}
+                className="w-full h-full object-cover object-center"
+                loading="eager"
+              />
+            </picture>
 
             {/* Gradient Overlay for high-contrast readability (only when text or buttons exist) */}
             {hasOverlay ? (
-              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/55 sm:via-black/35 to-transparent pointer-events-none" />
+              <div
+                className={`absolute inset-0 pointer-events-none ${
+                  hasText
+                    ? 'bg-gradient-to-t from-black/90 via-black/50 to-transparent md:bg-gradient-to-r md:from-black/85 md:via-black/55 md:to-transparent'
+                    : 'bg-gradient-to-t from-black/60 via-black/10 to-transparent md:bg-gradient-to-r md:from-black/45 md:via-black/15 md:to-transparent'
+                }`}
+              />
             ) : null}
 
             {/* Direct banner background link if buttons are disabled (e.g. clean festival/ad poster) */}
@@ -202,9 +234,9 @@ export default function HeroBannerSlider() {
             )}
           </div>
 
-          {/* Interactive Content & Action Buttons Overlay */}
+          {/* Interactive Content & Action Buttons Overlay: Bottom on mobile, Centered on desktop */}
           {hasOverlay && (
-            <div className="absolute inset-0 flex items-center z-10 pointer-events-none">
+            <div className="absolute inset-0 flex items-end pb-9 sm:pb-12 md:items-center md:pb-0 z-10 pointer-events-none">
               <div className="container mx-auto px-4 sm:px-6 md:px-12">
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
@@ -282,7 +314,7 @@ export default function HeroBannerSlider() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation Arrows (visible if more than 1 banner) */}
+      {/* Navigation Arrows (hidden on mobile, visible on desktop hover) */}
       {banners.length > 1 && (
         <>
           <button
@@ -291,9 +323,9 @@ export default function HeroBannerSlider() {
               handlePrev();
             }}
             aria-label="Previous Slide"
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-105 active:scale-95"
+            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-0 group-hover:opacity-100 hover:scale-105 active:scale-95"
           >
-            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+            <ChevronLeft className="w-6 h-6" />
           </button>
 
           <button
@@ -302,9 +334,9 @@ export default function HeroBannerSlider() {
               handleNext();
             }}
             aria-label="Next Slide"
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-105 active:scale-95"
+            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white items-center justify-center backdrop-blur-md border border-white/20 transition-all opacity-0 group-hover:opacity-100 hover:scale-105 active:scale-95"
           >
-            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+            <ChevronRight className="w-6 h-6" />
           </button>
         </>
       )}
@@ -331,8 +363,8 @@ export default function HeroBannerSlider() {
         </div>
       )}
 
-      {/* 2.4:1 Indicator watermark badge for accessibility / screen readers */}
-      <div className="sr-only">2.4:1 Aspect Ratio Hero Banner Carousel</div>
+      {/* Responsive ratio indicator for accessibility / screen readers */}
+      <div className="sr-only">Responsive Hero Banner Carousel (4:3 mobile, 2:1 tablet, 2.4:1 desktop)</div>
     </section>
   );
 }

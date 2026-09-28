@@ -119,16 +119,18 @@ export function getLocalBanners(): HeroBanner[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_BANNERS));
-      return DEFAULT_BANNERS;
+      return [];
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return [...parsed].sort((a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      // Purge stale default banner if custom banners exist
+      const customOnly = parsed.filter((b: HeroBanner) => b.id !== 'default-hero-1');
+      const list = customOnly.length > 0 ? customOnly : parsed;
+      return [...list].sort((a: HeroBanner, b: HeroBanner) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     }
-    return DEFAULT_BANNERS;
+    return [];
   } catch {
-    return DEFAULT_BANNERS;
+    return [];
   }
 }
 
@@ -211,6 +213,7 @@ export async function syncLocalBannersToSupabase(): Promise<HeroBanner[]> {
     const payload = {
       id: b.id,
       image_url: finalImageUrl,
+      mobile_image_url: b.mobile_image_url || null,
       badge_text: b.badge_text || null,
       title: b.title || null,
       subtitle: b.subtitle || null,
@@ -263,33 +266,25 @@ export async function fetchHeroBanners(onlyActive = false): Promise<HeroBanner[]
         setLocalBanners(sorted);
         if (onlyActive) {
           const activeOnly = sorted.filter((b: HeroBanner) => b.is_active);
-          return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
+          return activeOnly;
         }
         return sorted;
-      } else {
-        // Supabase table is empty ([]), but we have local banners in browser!
-        // Automatically sync local banners to Supabase table right now:
-        const migrated = await syncLocalBannersToSupabase();
-        if (migrated.length > 0) {
-          if (onlyActive) {
-            const activeOnly = migrated.filter((b) => b.is_active);
-            return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
-          }
-          return migrated;
-        }
       }
     }
   } catch (err) {
     console.log('Supabase hero_banners query notice:', err);
   }
 
-  // Fallback to local storage
+  // Fallback to local storage (only real active custom banners)
   const local = getLocalBanners();
-  if (onlyActive) {
-    const activeOnly = local.filter((b) => b.is_active);
-    return activeOnly.length > 0 ? activeOnly : DEFAULT_BANNERS;
+  if (local && local.length > 0) {
+    if (onlyActive) {
+      return local.filter((b) => b.is_active);
+    }
+    return local;
   }
-  return local;
+
+  return [];
 }
 
 /**
@@ -316,6 +311,10 @@ export async function createHeroBanner(
 ): Promise<HeroBanner> {
   const newBanner: HeroBanner = {
     ...bannerData,
+    title: bannerData.title ? bannerData.title.trim() || null : null,
+    subtitle: bannerData.subtitle ? bannerData.subtitle.trim() || null : null,
+    badge_text: bannerData.badge_text ? bannerData.badge_text.trim() || null : null,
+    mobile_image_url: bannerData.mobile_image_url || null,
     id: `banner-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -325,11 +324,14 @@ export async function createHeroBanner(
   try {
     let { error } = await supabase.from('hero_banners').insert(newBanner);
 
-    // If Supabase does not have hide_overlay column yet, retry insert without it
-    if (error && (error.message?.includes('hide_overlay') || error.code === 'PGRST204')) {
-      console.warn('hide_overlay column not found in Supabase schema cache. Retrying insert without it...');
-      const { hide_overlay, ...bannerWithoutOverlayCol } = newBanner;
-      const res = await supabase.from('hero_banners').insert(bannerWithoutOverlayCol);
+    // If Supabase does not have columns like mobile_image_url or hide_overlay yet, retry insert safely
+    if (error && (error.message?.includes('mobile_image_url') || error.message?.includes('hide_overlay') || error.code === 'PGRST204')) {
+      console.warn('Optional banner columns not yet found in Supabase schema cache. Retrying insert with base fields...');
+      const bannerFallback: any = { ...newBanner };
+      if (error.message?.includes('mobile_image_url')) delete bannerFallback.mobile_image_url;
+      if (error.message?.includes('hide_overlay')) delete bannerFallback.hide_overlay;
+      
+      const res = await supabase.from('hero_banners').insert(bannerFallback);
       error = res.error;
     }
 
@@ -360,19 +362,47 @@ export async function updateHeroBanner(
   id: string,
   updates: Partial<HeroBanner>
 ): Promise<void> {
+  // Normalize text fields so empty/deleted values are explicitly sent as null (not undefined)
+  // This ensures PostgreSQL executes SET column = NULL rather than ignoring the update
+  const sanitizedUpdates: Record<string, any> = { ...updates };
+  if ('title' in updates) {
+    const val = typeof updates.title === 'string' ? updates.title.trim() : updates.title;
+    sanitizedUpdates.title = val ? val : null;
+  }
+  if ('subtitle' in updates) {
+    const val = typeof updates.subtitle === 'string' ? updates.subtitle.trim() : updates.subtitle;
+    sanitizedUpdates.subtitle = val ? val : null;
+  }
+  if ('badge_text' in updates) {
+    const val = typeof updates.badge_text === 'string' ? updates.badge_text.trim() : updates.badge_text;
+    sanitizedUpdates.badge_text = val ? val : null;
+  }
+  if ('mobile_image_url' in updates) {
+    sanitizedUpdates.mobile_image_url = updates.mobile_image_url || null;
+  }
+  if ('button_text' in updates) {
+    sanitizedUpdates.button_text = updates.button_text || '';
+  }
+  if ('secondary_button_text' in updates) {
+    sanitizedUpdates.secondary_button_text = updates.secondary_button_text || '';
+  }
+
   try {
     let { error } = await supabase
       .from('hero_banners')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...sanitizedUpdates, updated_at: new Date().toISOString() })
       .eq('id', id);
 
-    // If Supabase does not have hide_overlay column yet, retry update without it
-    if (error && (error.message?.includes('hide_overlay') || error.code === 'PGRST204')) {
-      console.warn('hide_overlay column not found in Supabase schema cache. Retrying update without it...');
-      const { hide_overlay, ...updatesWithoutOverlayCol } = updates;
+    // If Supabase does not have mobile_image_url or hide_overlay columns yet, retry update safely
+    if (error && (error.message?.includes('mobile_image_url') || error.message?.includes('hide_overlay') || error.code === 'PGRST204')) {
+      console.warn('Optional banner columns not yet found in Supabase schema cache. Retrying update with base fields...');
+      const fallbackUpdates: any = { ...sanitizedUpdates, updated_at: new Date().toISOString() };
+      if (error.message?.includes('mobile_image_url')) delete fallbackUpdates.mobile_image_url;
+      if (error.message?.includes('hide_overlay')) delete fallbackUpdates.hide_overlay;
+      
       const res = await supabase
         .from('hero_banners')
-        .update({ ...updatesWithoutOverlayCol, updated_at: new Date().toISOString() })
+        .update(fallbackUpdates)
         .eq('id', id);
       error = res.error;
     }
@@ -389,7 +419,7 @@ export async function updateHeroBanner(
   }
 
   const current = getLocalBanners();
-  const updated = current.map((b) => (b.id === id ? { ...b, ...updates, updated_at: new Date().toISOString() } : b));
+  const updated = current.map((b) => (b.id === id ? { ...b, ...sanitizedUpdates, updated_at: new Date().toISOString() } : b));
   setLocalBanners(updated);
 
   broadcastBannerChange();

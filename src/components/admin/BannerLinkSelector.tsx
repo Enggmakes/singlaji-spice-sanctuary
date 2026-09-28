@@ -31,7 +31,7 @@ export default function BannerLinkSelector({
 }: BannerLinkSelectorProps) {
   // Option for display-only banners (no link, no button, no text)
   const displayOnlyOption: BannerLinkOption = {
-    label: '🚫 No Link, No Buttons, No Text (Display Only)',
+    label: 'No Link, No Buttons, No Text (Display Only)',
     value: 'none',
     suggestedButtonText: '',
     group: 'display',
@@ -129,7 +129,7 @@ export default function BannerLinkSelector({
         </Label>
         <span className="text-[10px] text-muted-foreground font-mono">
           {selectedDropdownValue === 'none'
-            ? '🚫 No Link (Display Only)'
+            ? 'Display Only (No Link)'
             : selectedDropdownValue === '__custom__'
             ? 'Custom URL'
             : 'Dynamic Auto-Route'}
@@ -143,13 +143,13 @@ export default function BannerLinkSelector({
           onChange={handleSelectChange}
           className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium text-foreground cursor-pointer"
         >
-          <optgroup label="🚫 Display Only / Clean Banner">
+          <optgroup label="Display Only / Clean Banner">
             <option value="none">
-              🚫 No Link, No Buttons, No Text (Display Only)
+              No Link, No Buttons, No Text (Display Only)
             </option>
           </optgroup>
 
-          <optgroup label="📌 Standard Store Pages">
+          <optgroup label="Standard Store Pages">
             {standardPages.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label} ({opt.value})
@@ -158,7 +158,7 @@ export default function BannerLinkSelector({
           </optgroup>
 
           {categoryOptions.length > 0 && (
-            <optgroup label={`🏷️ Store Categories (${categoryOptions.length})`}>
+            <optgroup label={`Store Categories (${categoryOptions.length})`}>
               {categoryOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -168,7 +168,7 @@ export default function BannerLinkSelector({
           )}
 
           {productOptions.length > 0 && (
-            <optgroup label={`🌶️ Individual Products (${productOptions.length})`}>
+            <optgroup label={`Individual Products (${productOptions.length})`}>
               {productOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -177,17 +177,11 @@ export default function BannerLinkSelector({
             </optgroup>
           )}
 
-          <optgroup label="🔗 Other / Custom Destination">
+          <optgroup label="Other / Custom Destination">
             <option value="__custom__">Custom URL / External Link...</option>
           </optgroup>
         </select>
       </div>
-
-      {selectedDropdownValue === 'none' && (
-        <p className="text-[10px] text-muted-foreground font-medium">
-          💡 Banner will be shown as a clean display image with no buttons, text overlays, or click links.
-        </p>
-      )}
 
       {selectedDropdownValue === '__custom__' && (
         <div className="pt-1 animate-in fade-in slide-in-from-top-1 duration-200">
