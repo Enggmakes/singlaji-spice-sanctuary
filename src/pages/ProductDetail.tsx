@@ -110,21 +110,11 @@ export default function ProductDetail() {
   const handleAddToCart = () => {
     if (!product) return;
     addItem(product, quantity, selectedWeightLabel || undefined, activePrice);
-    toast.success(
-      `Added ${quantity} × ${product.name}${
-        selectedWeightLabel ? ` (${selectedWeightLabel})` : ''
-      } to cart`
-    );
   };
 
   const handleQuickAdd = () => {
     if (!product) return;
     addItem(product, 1, selectedWeightLabel || undefined, activePrice);
-    toast.success(
-      `Added ${product.name}${
-        selectedWeightLabel ? ` (${selectedWeightLabel})` : ''
-      } to cart`
-    );
   };
 
   const handleIncrease = () => {
