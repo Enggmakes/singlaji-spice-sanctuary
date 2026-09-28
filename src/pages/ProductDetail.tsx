@@ -241,7 +241,7 @@ export default function ProductDetail() {
   const related = relatedProducts?.filter((p) => p.id !== product.id).slice(0, 4) || [];
 
   return (
-    <Layout whatsappClassName={totalItems > 0 ? "bottom-36 sm:bottom-6" : "bottom-24 sm:bottom-6"}>
+    <Layout>
       {/* 1. Main Product Section with Ambient Background */}
       <section className="relative overflow-hidden w-full max-w-full pb-8 sm:pb-12">
         {/* Ambient Mobile Background Image (9:16 vertical ratio) */}
