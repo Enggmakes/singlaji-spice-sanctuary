@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package, ChevronRight, Sparkles, Leaf } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/product/ProductCard';
@@ -376,26 +376,24 @@ export default function ProductDetail() {
               </div>
 
               {/* Description & Ingredients */}
-              <div className="space-y-4 mb-6">
+              <div className="space-y-5 mb-6">
                 {product.description && (
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      About This Product
+                    <h3 className="text-base font-bold text-foreground mb-2">
+                      About this product
                     </h3>
-                    <p className="text-sm sm:text-base text-foreground/85 leading-relaxed font-normal">
+                    <p className="text-sm sm:text-base text-foreground/80 leading-relaxed font-normal">
                       {product.description}
                     </p>
                   </div>
                 )}
 
                 {product.ingredients && (
-                  <div className="pt-3 border-t border-border/40">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
-                      <Leaf className="h-3.5 w-3.5 text-emerald-600" />
+                  <div className="pt-4 border-t border-border/40">
+                    <h3 className="text-base font-bold text-foreground mb-2">
                       Key Ingredients
                     </h3>
-                    <p className="text-sm text-foreground/85 leading-relaxed">
+                    <p className="text-sm sm:text-base text-foreground/80 leading-relaxed font-normal">
                       {product.ingredients}
                     </p>
                   </div>
