@@ -22,6 +22,11 @@ dist-ssr
 publc_html/
 public_html/
 publc_html_oldmilesweb/
+supabase/.temp/
+.cashfree*
+public/api/config.php
+dist/api/config.php
+
 
 # Editor directories and files
 .vscode/*
