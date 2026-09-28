@@ -11,6 +11,108 @@ import { useSEO } from '@/hooks/useSEO';
 import { parseWeightVariants, WeightVariant } from '@/lib/weightVariants';
 import { toast } from 'sonner';
 
+function PackSizeMarquee({
+  variants,
+  selectedVariant,
+  onSelect,
+}: {
+  variants: WeightVariant[];
+  selectedVariant: WeightVariant | null;
+  onSelect: (variant: WeightVariant) => void;
+}) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const isPausedRef = React.useRef(false);
+  const resumeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // If variants > 3, duplicate list for seamless infinite loop
+  const shouldLoop = variants.length > 3;
+  const items = shouldLoop ? [...variants, ...variants] : variants;
+
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !shouldLoop) return;
+
+    let animId: number;
+    const speed = 0.5; // gentle, steady scroll speed
+
+    const step = () => {
+      if (!isPausedRef.current && el) {
+        el.scrollLeft += speed;
+        // Seamless infinite loop: when reaching half, rewind by half
+        if (el.scrollLeft >= el.scrollWidth / 2) {
+          el.scrollLeft -= el.scrollWidth / 2;
+        }
+      }
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+    };
+  }, [shouldLoop, variants.length]);
+
+  const handlePause = () => {
+    isPausedRef.current = true;
+    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+  };
+
+  const handleResume = () => {
+    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+    resumeTimeoutRef.current = setTimeout(() => {
+      isPausedRef.current = false;
+    }, 2000); // 2s pause before resuming
+  };
+
+  return (
+    <div
+      className="relative w-full max-w-full overflow-hidden py-1"
+      onMouseEnter={handlePause}
+      onMouseLeave={handleResume}
+      onTouchStart={handlePause}
+      onTouchEnd={handleResume}
+    >
+      <div
+        ref={containerRef}
+        className="flex items-center gap-2.5 overflow-x-auto select-none cursor-grab active:cursor-grabbing [touch-action:pan-x] [overscroll-behavior-x:contain] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5"
+      >
+        {items.map((v, idx) => {
+          const isSelected = selectedVariant?.weight === v.weight;
+          return (
+            <button
+              key={`${v.weight}-${idx}`}
+              type="button"
+              onClick={() => {
+                onSelect(v);
+                handlePause();
+                handleResume();
+              }}
+              className={`shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm transition-all border ${
+                isSelected
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 font-semibold'
+                  : 'bg-card/70 backdrop-blur-sm text-foreground border-border hover:border-primary/40 hover:bg-card font-medium'
+              }`}
+            >
+              <span className="whitespace-nowrap tracking-tight font-semibold">{v.weight}</span>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-md font-bold whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-white/20 text-primary-foreground'
+                    : 'bg-muted/80 text-muted-foreground'
+                }`}
+              >
+                ₹{Math.round(v.price)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data: product, isLoading, error } = useProduct(slug!);
@@ -238,9 +340,9 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
 
-              {/* Weight / Pack Size Variants (Dropdown) */}
+              {/* Weight / Pack Size Variants (Marquee with instant pause on hitbox) */}
               {variants.length > 0 ? (
-                <div className="mb-5 space-y-2">
+                <div className="mb-5 space-y-1.5">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Select Pack Size
@@ -252,29 +354,11 @@ export default function ProductDetail() {
                     )}
                   </div>
 
-                  <div className="relative w-full max-w-md">
-                    <select
-                      value={selectedVariant?.weight || ''}
-                      onChange={(e) => {
-                        const match = variants.find((v) => v.weight === e.target.value);
-                        if (match) setSelectedVariant(match);
-                      }}
-                      className="w-full appearance-none bg-card/90 backdrop-blur-md border border-border hover:border-primary/50 text-foreground font-semibold text-sm rounded-xl px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm transition-all cursor-pointer"
-                    >
-                      {variants.map((v) => (
-                        <option
-                          key={v.weight}
-                          value={v.weight}
-                          className="bg-card text-foreground py-2 font-medium"
-                        >
-                          {v.weight} — ₹{Math.round(v.price)}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-muted-foreground">
-                      <ChevronDown className="h-4 w-4 text-foreground/70" />
-                    </div>
-                  </div>
+                  <PackSizeMarquee
+                    variants={variants}
+                    selectedVariant={selectedVariant}
+                    onSelect={setSelectedVariant}
+                  />
                 </div>
               ) : product.weight ? (
                 <p className="text-muted-foreground mb-4 font-medium">{product.weight}</p>
