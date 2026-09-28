@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package, ChevronRight, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/product/ProductCard';
@@ -136,7 +136,7 @@ export default function ProductDetail() {
   return (
     <Layout whatsappClassName={totalItems > 0 ? "bottom-36 sm:bottom-6" : "bottom-24 sm:bottom-6"}>
       {/* 1. Main Product Section with Ambient Background */}
-      <section className="relative overflow-hidden pb-8 sm:pb-12">
+      <section className="relative overflow-hidden w-full max-w-full pb-8 sm:pb-12">
         {/* Ambient Mobile Background Image (9:16 vertical ratio) */}
         <div
           className="block sm:hidden absolute inset-0 w-full pointer-events-none bg-no-repeat bg-top z-0"
@@ -159,7 +159,7 @@ export default function ProductDetail() {
             WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)',
           }}
         />
-        <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 relative z-10">
+        <div className="container mx-auto px-4 py-4 sm:py-6 md:py-8 relative z-10 w-full max-w-full overflow-hidden">
           {/* Breadcrumb */}
           <nav className="mb-4 sm:mb-6">
             <Link
@@ -172,23 +172,23 @@ export default function ProductDetail() {
           </nav>
 
           {/* Product Details */}
-          <div className="grid lg:grid-cols-2 gap-6 lg:gap-12 xl:gap-16 items-start">
+          <div className="grid lg:grid-cols-2 gap-6 lg:gap-12 xl:gap-16 items-start w-full min-w-0">
             {/* Image */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex justify-center"
+              className="flex justify-center w-full min-w-0"
             >
-              <div className="w-full max-w-[280px] sm:max-w-[340px] lg:max-w-[420px] flex items-center justify-center">
+              <div className="w-full max-w-[260px] sm:max-w-[320px] lg:max-w-[380px] flex items-center justify-center mx-auto">
                 {product.image_url ? (
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-auto max-h-[380px] sm:max-h-[460px] lg:max-h-[520px] block object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-[1.03]"
+                    className="w-full h-auto max-h-[340px] sm:max-h-[420px] lg:max-h-[480px] block object-contain drop-shadow-xl transition-transform duration-500 hover:scale-[1.02] mx-auto"
                   />
                 ) : (
-                  <div className="aspect-square w-full flex items-center justify-center bg-secondary/30 rounded-2xl">
+                  <div className="aspect-square w-full max-w-[260px] flex items-center justify-center bg-secondary/30 rounded-2xl mx-auto">
                     <span className="text-8xl font-serif text-muted-foreground/30">
                       {product.name.charAt(0)}
                     </span>
@@ -202,7 +202,7 @@ export default function ProductDetail() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex flex-col"
+              className="flex flex-col w-full min-w-0"
             >
               {/* Category & Stock Pill */}
               <div className="flex items-center gap-2.5 flex-wrap mb-2.5">
@@ -238,9 +238,9 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
 
-              {/* Weight / Pack Size Variants */}
+              {/* Weight / Pack Size Variants (Dropdown) */}
               {variants.length > 0 ? (
-                <div className="mb-5 space-y-2.5">
+                <div className="mb-5 space-y-2">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Select Pack Size
@@ -251,34 +251,29 @@ export default function ProductDetail() {
                       </span>
                     )}
                   </div>
-                  {/* Single Horizontal Swipeable Row (Blinkit style) */}
-                  <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-0.5 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {variants.map((v) => {
-                      const isSelected = selectedVariant?.weight === v.weight;
-                      return (
-                        <button
+
+                  <div className="relative w-full max-w-md">
+                    <select
+                      value={selectedVariant?.weight || ''}
+                      onChange={(e) => {
+                        const match = variants.find((v) => v.weight === e.target.value);
+                        if (match) setSelectedVariant(match);
+                      }}
+                      className="w-full appearance-none bg-card/90 backdrop-blur-md border border-border hover:border-primary/50 text-foreground font-semibold text-sm rounded-xl px-4 py-3 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm transition-all cursor-pointer"
+                    >
+                      {variants.map((v) => (
+                        <option
                           key={v.weight}
-                          type="button"
-                          onClick={() => setSelectedVariant(v)}
-                          className={`shrink-0 flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-sm transition-all border ${
-                            isSelected
-                              ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 font-semibold'
-                              : 'bg-background/40 backdrop-blur-sm text-foreground border-border/80 hover:border-primary/40 hover:bg-background/70 font-medium'
-                          }`}
+                          value={v.weight}
+                          className="bg-card text-foreground py-2 font-medium"
                         >
-                          <span className="whitespace-nowrap tracking-tight font-semibold">{v.weight}</span>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-md font-bold whitespace-nowrap ${
-                              isSelected
-                                ? 'bg-white/20 text-primary-foreground'
-                                : 'bg-muted/70 text-muted-foreground'
-                            }`}
-                          >
-                            ₹{Math.round(v.price)}
-                          </span>
-                        </button>
-                      );
-                    })}
+                          {v.weight} — ₹{Math.round(v.price)}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-muted-foreground">
+                      <ChevronDown className="h-4 w-4 text-foreground/70" />
+                    </div>
                   </div>
                 </div>
               ) : product.weight ? (
