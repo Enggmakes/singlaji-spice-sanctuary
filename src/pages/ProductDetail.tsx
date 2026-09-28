@@ -251,7 +251,8 @@ export default function ProductDetail() {
                       </span>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {/* Single Horizontal Swipeable Row (Blinkit style) */}
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-0.5 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {variants.map((v) => {
                       const isSelected = selectedVariant?.weight === v.weight;
                       return (
@@ -259,15 +260,15 @@ export default function ProductDetail() {
                           key={v.weight}
                           type="button"
                           onClick={() => setSelectedVariant(v)}
-                          className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-all border ${
+                          className={`shrink-0 flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-sm transition-all border ${
                             isSelected
                               ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20 font-semibold'
                               : 'bg-background/40 backdrop-blur-sm text-foreground border-border/80 hover:border-primary/40 hover:bg-background/70 font-medium'
                           }`}
                         >
-                          <span className="tracking-tight">{v.weight}</span>
+                          <span className="whitespace-nowrap tracking-tight font-semibold">{v.weight}</span>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded-md font-bold ${
+                            className={`text-xs px-2 py-0.5 rounded-md font-bold whitespace-nowrap ${
                               isSelected
                                 ? 'bg-white/20 text-primary-foreground'
                                 : 'bg-muted/70 text-muted-foreground'
