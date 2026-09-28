@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, ShoppingCart, Truck, Shield, Package, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/product/ProductCard';
@@ -15,7 +15,7 @@ export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data: product, isLoading, error } = useProduct(slug!);
   const { data: relatedProducts } = useProducts(product?.category?.slug);
-  const { addItem, items, updateQuantity } = useCart();
+  const { addItem, items, updateQuantity, totalItems, subtotal } = useCart();
   const [quantity, setQuantity] = useState(1);
 
   const variants = product ? parseWeightVariants(product.weight, product.price) : [];
@@ -144,7 +144,7 @@ export default function ProductDetail() {
   const related = relatedProducts?.filter((p) => p.id !== product.id).slice(0, 4) || [];
 
   return (
-    <Layout whatsappClassName="bottom-24 sm:bottom-6">
+    <Layout whatsappClassName={totalItems > 0 ? "bottom-36 sm:bottom-6" : "bottom-24 sm:bottom-6"}>
       {/* 1. Main Product Section with Proportional Ambient Framing Background */}
       <section className="relative overflow-hidden pb-8 sm:pb-12">
         {/* Ambient Mobile Background Image (9:16 vertical ratio, 12% subtle opacity) */}
@@ -329,8 +329,8 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {/* Quantity & Add to Cart */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            {/* Quantity & Add to Cart (Desktop only: hidden on mobile where Blinkit sticky bottom bar handles it) */}
+            <div className="hidden md:flex flex-col sm:flex-row gap-4 mb-8">
               {cartQuantity > 0 ? (
                 <div className="flex items-center gap-3">
                   <div className="flex items-center bg-primary text-primary-foreground rounded-xl shadow-sm border border-primary/20 overflow-hidden font-bold">
@@ -430,7 +430,7 @@ export default function ProductDetail() {
 
     {/* 2. Related Products / Recommendations Section */}
     {related.length > 0 && (
-      <section className="py-8 sm:py-12 pb-28 sm:pb-16 border-t border-border/15">
+      <section className="py-8 sm:py-12 pb-36 sm:pb-16 border-t border-border/15">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-serif font-bold mb-8">
             You May Also Like
@@ -444,11 +444,39 @@ export default function ProductDetail() {
       </section>
     )}
 
-    {/* Blinkit-Style Sticky Bottom Action Bar (Fixed across screen bottom on mobile) */}
+    {/* Blinkit-Style Sticky Bottom Action Bar (Fixed across mobile viewport) */}
     {product && (
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-[0_-4px_24px_rgba(0,0,0,0.12)] px-4 py-3 sm:px-6 md:hidden">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-[0_-4px_24px_rgba(0,0,0,0.12)] pt-2 pb-3 px-4 sm:px-6 md:hidden">
+        {/* Floating Blinkit 'View Cart' Pill above the bottom bar */}
+        {totalItems > 0 && (
+          <div className="container mx-auto max-w-lg mb-2">
+            <Link
+              to="/cart"
+              className="w-full flex items-center justify-between bg-primary hover:bg-primary/95 text-primary-foreground px-3.5 py-2.5 rounded-xl shadow-lg active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-black/15 flex items-center justify-center shrink-0">
+                  <ShoppingCart className="h-4 w-4 text-primary-foreground" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-bold leading-tight">
+                    {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                  </span>
+                  <span className="text-xs font-semibold leading-tight text-primary-foreground/90">
+                    ₹{Math.round(subtotal)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-0.5 text-sm font-bold tracking-wide">
+                <span>View Cart</span>
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </Link>
+          </div>
+        )}
+
         <div className="container mx-auto flex items-center justify-between gap-3 max-w-lg">
-          {/* Left: Pack Size, Price & Taxes (referring directly to Blinkit layout) */}
+          {/* Left: Pack Size, Price & Taxes */}
           <div className="flex flex-col min-w-0 pr-2">
             {selectedWeightLabel && (
               <span className="text-xs font-semibold text-muted-foreground truncate">
@@ -473,26 +501,26 @@ export default function ProductDetail() {
           {/* Right: Blinkit-style Add to cart / Stepper */}
           <div className="shrink-0">
             {cartQuantity > 0 ? (
-              <div className="flex items-center bg-primary text-primary-foreground rounded-xl shadow-md border border-primary/20 overflow-hidden font-bold">
+              <div className="flex items-center bg-primary text-primary-foreground rounded-xl shadow-md font-bold overflow-hidden">
                 <button
                   type="button"
                   onClick={handleDecrease}
-                  className="p-2.5 px-3.5 hover:bg-black/10 active:scale-95 transition-all flex items-center justify-center"
+                  className="p-2.5 px-3.5 hover:bg-black/10 active:scale-90 transition-all flex items-center justify-center text-primary-foreground"
                   aria-label="Decrease quantity"
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-4 w-4 stroke-[2.5]" />
                 </button>
-                <span className="px-3 text-sm min-w-[2rem] text-center font-bold">
+                <span className="px-3 text-sm min-w-[2rem] text-center font-bold text-primary-foreground">
                   {cartQuantity}
                 </span>
                 <button
                   type="button"
                   onClick={handleIncrease}
                   disabled={cartQuantity >= product.stock}
-                  className="p-2.5 px-3.5 hover:bg-black/10 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center"
+                  className="p-2.5 px-3.5 hover:bg-black/10 active:scale-90 transition-all disabled:opacity-50 flex items-center justify-center text-primary-foreground"
                   aria-label="Increase quantity"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 stroke-[2.5]" />
                 </button>
               </div>
             ) : (
@@ -500,7 +528,7 @@ export default function ProductDetail() {
                 type="button"
                 onClick={handleQuickAdd}
                 disabled={product.stock === 0}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-7 py-2.5 rounded-xl shadow-md text-sm active:scale-95 transition-all flex items-center gap-2"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-7 py-2.5 rounded-xl shadow-md text-sm active:scale-95 transition-all flex items-center gap-1.5"
               >
                 <ShoppingCart className="h-4 w-4" />
                 <span>{product.stock === 0 ? 'Out of Stock' : 'Add to cart'}</span>
