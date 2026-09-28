@@ -33,7 +33,7 @@ function PackSizeMarquee({
     if (!el || !shouldLoop) return;
 
     let animId: number;
-    const speed = 0.5; // gentle, steady scroll speed
+    const speed = 0.2; // ultra-slow, gentle glide
 
     const step = () => {
       if (!isPausedRef.current && el) {
@@ -68,7 +68,7 @@ function PackSizeMarquee({
 
   return (
     <div
-      className="relative w-full max-w-full overflow-hidden py-1"
+      className="relative -mx-4 sm:mx-0 overflow-hidden py-1"
       onMouseEnter={handlePause}
       onMouseLeave={handleResume}
       onTouchStart={handlePause}
@@ -76,7 +76,7 @@ function PackSizeMarquee({
     >
       <div
         ref={containerRef}
-        className="flex items-center gap-2.5 overflow-x-auto select-none cursor-grab active:cursor-grabbing [touch-action:pan-x] [overscroll-behavior-x:contain] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5"
+        className="flex items-center gap-2.5 overflow-x-auto select-none cursor-grab active:cursor-grabbing [touch-action:pan-x] [overscroll-behavior-x:contain] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-4 sm:px-0 py-0.5"
       >
         {items.map((v, idx) => {
           const isSelected = selectedVariant?.weight === v.weight;
