@@ -2,12 +2,14 @@ import { ReactNode } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import { MessageCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface LayoutProps {
   children: ReactNode;
+  whatsappClassName?: string;
 }
 
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({ children, whatsappClassName }: LayoutProps) {
   return (
     <div className="min-h-screen flex flex-col relative w-full max-w-full overflow-x-hidden">
       <Header />
@@ -19,7 +21,10 @@ export default function Layout({ children }: LayoutProps) {
         href="https://wa.me/918872572784?text=Hi%20Singlaji%20Store!%20I%20have%20an%20inquiry%20about%20your%20spices."
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 bg-[#25D366] hover:bg-[#20ba59] text-white p-3 sm:p-3.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-2 group"
+        className={cn(
+          "fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 bg-[#25D366] hover:bg-[#20ba59] text-white p-3 sm:p-3.5 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-2 group",
+          whatsappClassName
+        )}
         title="Chat on WhatsApp"
         aria-label="Chat on WhatsApp"
       >
@@ -31,3 +36,4 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   );
 }
+

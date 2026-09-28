@@ -15,7 +15,7 @@ export default function ProductDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data: product, isLoading, error } = useProduct(slug!);
   const { data: relatedProducts } = useProducts(product?.category?.slug);
-  const { addItem } = useCart();
+  const { addItem, items, updateQuantity } = useCart();
   const [quantity, setQuantity] = useState(1);
 
   const variants = product ? parseWeightVariants(product.weight, product.price) : [];
@@ -100,6 +100,13 @@ export default function ProductDetail() {
         )
       : 0;
 
+  const currentCartItem = items.find(
+    (item) =>
+      item.product.id === product?.id &&
+      (item.selectedWeight || '') === (selectedWeightLabel || '')
+  );
+  const cartQuantity = currentCartItem?.quantity || 0;
+
   const handleAddToCart = () => {
     if (!product) return;
     addItem(product, quantity, selectedWeightLabel || undefined, activePrice);
@@ -110,10 +117,34 @@ export default function ProductDetail() {
     );
   };
 
+  const handleQuickAdd = () => {
+    if (!product) return;
+    addItem(product, 1, selectedWeightLabel || undefined, activePrice);
+    toast.success(
+      `Added ${product.name}${
+        selectedWeightLabel ? ` (${selectedWeightLabel})` : ''
+      } to cart`
+    );
+  };
+
+  const handleIncrease = () => {
+    if (!product) return;
+    if (cartQuantity >= product.stock) {
+      toast.error(`Only ${product.stock} available in stock`);
+      return;
+    }
+    updateQuantity(product.id, cartQuantity + 1, selectedWeightLabel || undefined);
+  };
+
+  const handleDecrease = () => {
+    if (!product) return;
+    updateQuantity(product.id, cartQuantity - 1, selectedWeightLabel || undefined);
+  };
+
   const related = relatedProducts?.filter((p) => p.id !== product.id).slice(0, 4) || [];
 
   return (
-    <Layout>
+    <Layout whatsappClassName="bottom-24 sm:bottom-6">
       {/* 1. Main Product Section with Proportional Ambient Framing Background */}
       <section className="relative overflow-hidden pb-8 sm:pb-12">
         {/* Ambient Mobile Background Image (9:16 vertical ratio, 12% subtle opacity) */}
@@ -300,34 +331,66 @@ export default function ProductDetail() {
 
             {/* Quantity & Add to Cart */}
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <div className="flex items-center border border-border rounded-lg">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="p-3 hover:bg-muted transition-colors"
-                  disabled={quantity <= 1}
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <span className="px-6 text-lg font-medium min-w-[4rem] text-center">
-                  {quantity}
-                </span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="p-3 hover:bg-muted transition-colors"
-                  disabled={quantity >= product.stock}
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-              <Button
-                onClick={handleAddToCart}
-                size="lg"
-                className="flex-1 sm:flex-none sm:min-w-[200px]"
-                disabled={product.stock === 0}
-              >
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                Add to Cart
-              </Button>
+              {cartQuantity > 0 ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-primary text-primary-foreground rounded-xl shadow-sm border border-primary/20 overflow-hidden font-bold">
+                    <button
+                      type="button"
+                      onClick={handleDecrease}
+                      className="p-3 px-4 hover:bg-black/10 active:scale-95 transition-all flex items-center justify-center"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="px-4 text-base min-w-[3rem] text-center font-bold">
+                      {cartQuantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleIncrease}
+                      disabled={cartQuantity >= product.stock}
+                      className="p-3 px-4 hover:bg-black/10 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    ✓ In your cart
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                  <div className="flex items-center border border-border rounded-lg">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="p-3 hover:bg-muted transition-colors"
+                      disabled={quantity <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="px-6 text-lg font-medium min-w-[4rem] text-center">
+                      {quantity}
+                    </span>
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="p-3 hover:bg-muted transition-colors"
+                      disabled={quantity >= product.stock}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <Button
+                    onClick={handleAddToCart}
+                    size="lg"
+                    className="flex-1 sm:flex-none sm:min-w-[200px]"
+                    disabled={product.stock === 0}
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Add to Cart
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Features */}
@@ -367,7 +430,7 @@ export default function ProductDetail() {
 
     {/* 2. Related Products / Recommendations Section */}
     {related.length > 0 && (
-      <section className="py-8 sm:py-12 border-t border-border/15">
+      <section className="py-8 sm:py-12 pb-28 sm:pb-16 border-t border-border/15">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl font-serif font-bold mb-8">
             You May Also Like
@@ -379,6 +442,73 @@ export default function ProductDetail() {
           </div>
         </div>
       </section>
+    )}
+
+    {/* Blinkit-Style Sticky Bottom Action Bar (Fixed across screen bottom on mobile) */}
+    {product && (
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-[0_-4px_24px_rgba(0,0,0,0.12)] px-4 py-3 sm:px-6 md:hidden">
+        <div className="container mx-auto flex items-center justify-between gap-3 max-w-lg">
+          {/* Left: Pack Size, Price & Taxes (referring directly to Blinkit layout) */}
+          <div className="flex flex-col min-w-0 pr-2">
+            {selectedWeightLabel && (
+              <span className="text-xs font-semibold text-muted-foreground truncate">
+                {selectedWeightLabel}
+              </span>
+            )}
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-bold text-foreground">
+                ₹{activePrice.toFixed(0)}
+              </span>
+              {product.compare_at_price && product.compare_at_price > activePrice && (
+                <span className="text-xs text-muted-foreground line-through">
+                  ₹{product.compare_at_price.toFixed(0)}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] text-muted-foreground tracking-tight">
+              Inclusive of all taxes
+            </span>
+          </div>
+
+          {/* Right: Blinkit-style Add to cart / Stepper */}
+          <div className="shrink-0">
+            {cartQuantity > 0 ? (
+              <div className="flex items-center bg-primary text-primary-foreground rounded-xl shadow-md border border-primary/20 overflow-hidden font-bold">
+                <button
+                  type="button"
+                  onClick={handleDecrease}
+                  className="p-2.5 px-3.5 hover:bg-black/10 active:scale-95 transition-all flex items-center justify-center"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="px-3 text-sm min-w-[2rem] text-center font-bold">
+                  {cartQuantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleIncrease}
+                  disabled={cartQuantity >= product.stock}
+                  className="p-2.5 px-3.5 hover:bg-black/10 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center"
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleQuickAdd}
+                disabled={product.stock === 0}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-7 py-2.5 rounded-xl shadow-md text-sm active:scale-95 transition-all flex items-center gap-2"
+              >
+                <ShoppingCart className="h-4 w-4" />
+                <span>{product.stock === 0 ? 'Out of Stock' : 'Add to cart'}</span>
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
     )}
   </Layout>
   );
