@@ -259,6 +259,7 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          images: string[] | null
           ingredients: string | null
           is_active: boolean | null
           is_featured: boolean | null
@@ -276,6 +277,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          images?: string[] | null
           ingredients?: string | null
           is_active?: boolean | null
           is_featured?: boolean | null
@@ -293,6 +295,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          images?: string[] | null
           ingredients?: string | null
           is_active?: boolean | null
           is_featured?: boolean | null

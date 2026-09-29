@@ -426,9 +426,81 @@ export async function updateHeroBanner(
 }
 
 /**
- * Delete a hero banner
+ * Delete a banner image file from Supabase Storage
  */
-export async function deleteHeroBanner(id: string): Promise<void> {
+export async function deleteStorageBannerImage(url: string | null | undefined): Promise<boolean> {
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return false;
+  try {
+    let path: string | null = null;
+    let bucketName = 'product-images';
+
+    if (url.includes('/product-images/')) {
+      const parts = url.split('/product-images/');
+      if (parts.length > 1) {
+        path = decodeURIComponent(parts[parts.length - 1].split('?')[0]);
+        bucketName = 'product-images';
+      }
+    } else if (url.includes('/products/')) {
+      const parts = url.split('/products/');
+      if (parts.length > 1) {
+        path = decodeURIComponent(parts[parts.length - 1].split('?')[0]);
+        bucketName = 'products';
+      }
+    }
+
+    if (path) {
+      const { error } = await supabase.storage.from(bucketName).remove([path]);
+      if (!error) {
+        console.log(`Purged banner image from storage (${bucketName}):`, path);
+        return true;
+      } else {
+        console.warn('Storage delete error:', error.message);
+      }
+    }
+  } catch (e) {
+    console.warn('Storage delete exception:', e);
+  }
+  return false;
+}
+
+/**
+ * Delete a hero banner and its associated images from Supabase storage
+ */
+export async function deleteHeroBanner(
+  id: string,
+  bannerUrls?: { image_url?: string | null; mobile_image_url?: string | null }
+): Promise<void> {
+  // 1. Resolve image URLs to purge from Supabase storage
+  let imgUrl = bannerUrls?.image_url;
+  let mobUrl = bannerUrls?.mobile_image_url;
+
+  if (!imgUrl && !mobUrl) {
+    const local = getLocalBanners().find((b) => b.id === id);
+    if (local) {
+      imgUrl = local.image_url;
+      mobUrl = local.mobile_image_url;
+    } else {
+      try {
+        const { data } = await supabase
+          .from('hero_banners')
+          .select('image_url, mobile_image_url')
+          .eq('id', id)
+          .maybeSingle();
+        if (data) {
+          imgUrl = data.image_url;
+          mobUrl = data.mobile_image_url;
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // 2. Delete storage files
+  if (imgUrl) await deleteStorageBannerImage(imgUrl);
+  if (mobUrl) await deleteStorageBannerImage(mobUrl);
+
+  // 3. Delete database row
   try {
     const { error } = await supabase.from('hero_banners').delete().eq('id', id);
     if (error) {
@@ -448,8 +520,78 @@ export async function deleteHeroBanner(id: string): Promise<void> {
 }
 
 /**
+ * Purge all orphaned banner images from Supabase storage that are not used by any active banner
+ */
+export async function cleanOrphanedBannerStorage(): Promise<{ removedCount: number; errors: number }> {
+  try {
+    // 1. Fetch all current banner image URLs
+    const { data: dbBanners } = await supabase
+      .from('hero_banners')
+      .select('id, image_url, mobile_image_url');
+    
+    const localBanners = getLocalBanners();
+    const activeFilenames = new Set<string>();
+
+    const checkUrl = (url: string | null | undefined) => {
+      if (!url) return;
+      if (url.includes('/banners/')) {
+        const parts = url.split('/banners/');
+        if (parts.length > 1) {
+          const filename = decodeURIComponent(parts[1].split('?')[0]);
+          activeFilenames.add(filename);
+        }
+      }
+    };
+
+    (dbBanners || []).forEach((b) => {
+      checkUrl(b.image_url);
+      checkUrl(b.mobile_image_url);
+    });
+
+    localBanners.forEach((b) => {
+      checkUrl(b.image_url);
+      checkUrl(b.mobile_image_url);
+    });
+
+    // 2. List all files currently in 'product-images/banners/'
+    const { data: files, error: listErr } = await supabase.storage
+      .from('product-images')
+      .list('banners', { limit: 100 });
+
+    if (listErr || !files) {
+      console.warn('Unable to list storage banner files:', listErr);
+      return { removedCount: 0, errors: listErr ? 1 : 0 };
+    }
+
+    const pathsToDelete = files
+      .filter((f) => !activeFilenames.has(f.name))
+      .map((f) => `banners/${f.name}`);
+
+    if (pathsToDelete.length === 0) {
+      return { removedCount: 0, errors: 0 };
+    }
+
+    const { error: removeErr } = await supabase.storage
+      .from('product-images')
+      .remove(pathsToDelete);
+
+    if (removeErr) {
+      console.error('Failed to remove orphaned storage banners:', removeErr);
+      return { removedCount: 0, errors: 1 };
+    }
+
+    console.log(`Cleaned up ${pathsToDelete.length} orphaned banner images from storage!`);
+    return { removedCount: pathsToDelete.length, errors: 0 };
+  } catch (err) {
+    console.error('cleanOrphanedBannerStorage error:', err);
+    return { removedCount: 0, errors: 1 };
+  }
+}
+
+/**
  * Toggle active status
  */
 export async function toggleHeroBannerActive(id: string, currentStatus: boolean): Promise<void> {
   await updateHeroBanner(id, { is_active: !currentStatus });
 }
+

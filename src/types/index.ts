@@ -19,6 +19,7 @@ export interface Product {
   stock: number;
   category_id: string | null;
   image_url: string | null;
+  images?: string[] | null;
   is_featured: boolean;
   is_active: boolean;
   weight: string | null;

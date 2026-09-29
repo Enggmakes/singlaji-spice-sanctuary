@@ -61,6 +61,7 @@ import {
   toggleHeroBannerActive,
   reorderHeroBanners,
   validate16by9Ratio,
+  deleteStorageBannerImage,
 } from '@/lib/bannerService';
 import { compressImage } from '@/lib/imageCompressor';
 import {
@@ -91,6 +92,7 @@ interface Product {
   price: number;
   stock: number;
   image_url: string | null;
+  images?: string[] | null;
   category_id?: string;
   description?: string;
   weight?: string;
@@ -613,7 +615,8 @@ export default function Admin() {
     stock: string;
     category_id: string;
     description: string;
-    image: File | null;
+    images: File[];
+    imagePreviews: string[];
     variants: WeightVariant[];
   }>({
     name: '',
@@ -621,7 +624,8 @@ export default function Admin() {
     stock: '',
     category_id: '',
     description: '',
-    image: null,
+    images: [],
+    imagePreviews: [],
     variants: [],
   });
 
@@ -634,9 +638,9 @@ export default function Admin() {
     stock: string;
     category_id: string;
     description: string;
-    imageFile: File | null;
-    currentImageUrl: string | null;
-    previewUrl: string | null;
+    existingImages: string[];
+    newImageFiles: File[];
+    newImagePreviews: string[];
     variants: WeightVariant[];
   }>({
     name: '',
@@ -644,9 +648,9 @@ export default function Admin() {
     stock: '',
     category_id: '',
     description: '',
-    imageFile: null,
-    currentImageUrl: null,
-    previewUrl: null,
+    existingImages: [],
+    newImageFiles: [],
+    newImagePreviews: [],
     variants: [],
   });
 
@@ -905,10 +909,18 @@ export default function Admin() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, price, stock, image_url, category_id, description, weight')
+        .select('id, name, slug, price, stock, image_url, images, category_id, description, weight')
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      if (data) setProducts(data);
+      if (error) {
+        console.warn('Error fetching products with images, retrying fallback:', error);
+        const fallback = await supabase
+          .from('products')
+          .select('id, name, slug, price, stock, image_url, category_id, description, weight')
+          .order('created_at', { ascending: false });
+        if (fallback.data) setProducts(fallback.data as Product[]);
+      } else if (data) {
+        setProducts(data as Product[]);
+      }
     } catch (err: any) {
       console.error('Error fetching products:', err);
     }
@@ -1088,6 +1100,45 @@ export default function Admin() {
     throw new Error('Failed to process and save product image');
   };
 
+  const handleAddProductImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const newPreviews = files.map((f) => URL.createObjectURL(f));
+    setProductForm((prev) => ({
+      ...prev,
+      images: [...prev.images, ...files],
+      imagePreviews: [...prev.imagePreviews, ...newPreviews],
+    }));
+    e.target.value = '';
+  };
+
+  const handleRemoveAddProductImage = (index: number) => {
+    setProductForm((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+      imagePreviews: prev.imagePreviews.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSetCoverAddProductImage = (index: number) => {
+    setProductForm((prev) => {
+      if (index <= 0 || index >= prev.images.length) return prev;
+      const nextImages = [...prev.images];
+      const [chosenFile] = nextImages.splice(index, 1);
+      nextImages.unshift(chosenFile);
+
+      const nextPreviews = [...prev.imagePreviews];
+      const [chosenPrev] = nextPreviews.splice(index, 1);
+      nextPreviews.unshift(chosenPrev);
+
+      return {
+        ...prev,
+        images: nextImages,
+        imagePreviews: nextPreviews,
+      };
+    });
+  };
+
   // Product Handlers
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1098,11 +1149,12 @@ export default function Admin() {
 
     setAddingProduct(true);
     try {
-      let image_url = null;
-
-      if (productForm.image) {
-        image_url = await uploadImageFile(productForm.image);
+      const uploadedUrls: string[] = [];
+      for (const file of productForm.images) {
+        const url = await uploadImageFile(file);
+        if (url) uploadedUrls.push(url);
       }
+      const primaryImageUrl = uploadedUrls[0] || null;
 
       const slug =
         productForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') +
@@ -1115,27 +1167,37 @@ export default function Admin() {
         ? Math.min(...validVariants.map((v) => v.price))
         : parseFloat(productForm.price) || 0;
 
-      const { error } = await supabase.from('products').insert({
+      const productPayload: any = {
         name: productForm.name.trim(),
         slug,
         price: finalPrice,
         stock: parseInt(productForm.stock) || 0,
         category_id: productForm.category_id,
         description: productForm.description.trim() || null,
-        image_url,
+        image_url: primaryImageUrl,
+        images: uploadedUrls,
         weight: weightData || null,
-      });
+      };
+
+      let { error } = await supabase.from('products').insert(productPayload);
+      if (error && (error.message?.includes('images') || error.code === 'PGRST204')) {
+        const fallback = { ...productPayload };
+        delete fallback.images;
+        const res = await supabase.from('products').insert(fallback);
+        error = res.error;
+      }
 
       if (error) throw error;
 
-      toast.success('Product added successfully');
+      toast.success('Product added successfully with gallery');
       setProductForm({
         name: '',
         price: '',
         stock: '',
         category_id: '',
         description: '',
-        image: null,
+        images: [],
+        imagePreviews: [],
         variants: [],
       });
       fetchProducts();
@@ -1165,29 +1227,109 @@ export default function Admin() {
       }
     }
 
+    let currentImgs: string[] = [];
+    if (prod.images) {
+      if (Array.isArray(prod.images)) {
+        currentImgs = prod.images.filter((img): img is string => typeof img === 'string' && img.trim().length > 0);
+      } else if (typeof prod.images === 'string') {
+        try {
+          const parsed = JSON.parse(prod.images);
+          if (Array.isArray(parsed)) {
+            currentImgs = parsed.filter((img): img is string => typeof img === 'string' && img.trim().length > 0);
+          }
+        } catch {
+          if (prod.images.trim()) currentImgs = [prod.images.trim()];
+        }
+      }
+    }
+    if (currentImgs.length === 0 && prod.image_url) {
+      currentImgs = [prod.image_url];
+    }
+
     setEditForm({
       name: prod.name,
       price: initialPrice,
       stock: (prod.stock ?? 0).toString(),
       category_id: prod.category_id || '',
       description: prod.description || '',
-      imageFile: null,
-      currentImageUrl: prod.image_url,
-      previewUrl: null,
+      existingImages: currentImgs,
+      newImageFiles: [],
+      newImagePreviews: [],
       variants: parsedVariants,
     });
+
+    // Real-time fresh fetch: Query Supabase immediately to ensure latest images array is 100% loaded
+    supabase
+      .from('products')
+      .select('id, name, slug, price, stock, image_url, images, category_id, description, weight')
+      .eq('id', prod.id)
+      .single()
+      .then(({ data: freshProd }) => {
+        if (!freshProd) return;
+        let freshImgs: string[] = [];
+        if (freshProd.images) {
+          if (Array.isArray(freshProd.images)) {
+            freshImgs = freshProd.images.filter((img: any) => typeof img === 'string' && img.trim().length > 0);
+          } else if (typeof freshProd.images === 'string') {
+            try {
+              const parsed = JSON.parse(freshProd.images);
+              if (Array.isArray(parsed)) {
+                freshImgs = parsed.filter((img: any) => typeof img === 'string' && img.trim().length > 0);
+              }
+            } catch {
+              if (freshProd.images.trim()) freshImgs = [freshProd.images.trim()];
+            }
+          }
+        }
+        if (freshImgs.length === 0 && freshProd.image_url) {
+          freshImgs = [freshProd.image_url];
+        }
+        if (freshImgs.length > 0) {
+          setEditingProduct((prev) => (prev && prev.id === freshProd.id ? { ...prev, ...freshProd } : prev));
+          setEditForm((prev) => ({
+            ...prev,
+            existingImages: freshImgs,
+          }));
+        }
+      })
+      .catch((err) => console.warn('Could not refresh product in edit modal:', err));
   };
 
-  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    if (file) {
-      const preview = URL.createObjectURL(file);
-      setEditForm((prev) => ({
-        ...prev,
-        imageFile: file,
-        previewUrl: preview,
-      }));
-    }
+  const handleEditAddImageFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const newPreviews = files.map((f) => URL.createObjectURL(f));
+    setEditForm((prev) => ({
+      ...prev,
+      newImageFiles: [...prev.newImageFiles, ...files],
+      newImagePreviews: [...prev.newImagePreviews, ...newPreviews],
+    }));
+    e.target.value = '';
+  };
+
+  const handleRemoveExistingImage = (urlToRemove: string) => {
+    setEditForm((prev) => ({
+      ...prev,
+      existingImages: prev.existingImages.filter((img) => img !== urlToRemove),
+    }));
+  };
+
+  const handleRemoveNewImage = (index: number) => {
+    setEditForm((prev) => ({
+      ...prev,
+      newImageFiles: prev.newImageFiles.filter((_, i) => i !== index),
+      newImagePreviews: prev.newImagePreviews.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSetCoverExistingImage = (index: number) => {
+    setEditForm((prev) => {
+      if (index <= 0 || index >= prev.existingImages.length) return prev;
+      const next = [...prev.existingImages];
+      const [chosen] = next.splice(index, 1);
+      next.unshift(chosen);
+      return { ...prev, existingImages: next };
+    });
   };
 
   const handleSaveEditProduct = async (e: React.FormEvent) => {
@@ -1200,15 +1342,26 @@ export default function Admin() {
 
     setSavingEdit(true);
     try {
-      let finalImageUrl = editForm.currentImageUrl;
+      const newlyUploadedUrls: string[] = [];
+      for (const file of editForm.newImageFiles) {
+        const url = await uploadImageFile(file);
+        if (url) newlyUploadedUrls.push(url);
+      }
 
-      // 1. If a new image was chosen, upload to product-images and delete old image
-      if (editForm.imageFile) {
-        finalImageUrl = await uploadImageFile(editForm.imageFile);
+      const finalImages = [...editForm.existingImages, ...newlyUploadedUrls];
+      const finalImageUrl = finalImages[0] || null;
 
-        // Delete previous image file from database storage if different
-        if (editingProduct.image_url && editingProduct.image_url !== finalImageUrl) {
-          await deleteOldProductImage(editingProduct.image_url);
+      // Purge any deleted images from Supabase storage
+      const originalImages = new Set<string>();
+      if (editingProduct.images && Array.isArray(editingProduct.images)) {
+        editingProduct.images.forEach((img) => img && originalImages.add(img));
+      }
+      if (editingProduct.image_url) originalImages.add(editingProduct.image_url);
+
+      const keptImages = new Set(finalImages);
+      for (const oldUrl of Array.from(originalImages)) {
+        if (!keptImages.has(oldUrl)) {
+          await deleteOldProductImage(oldUrl);
         }
       }
 
@@ -1218,20 +1371,29 @@ export default function Admin() {
         ? Math.min(...validVariants.map((v) => v.price))
         : parseFloat(editForm.price) || 0;
 
-      // 2. Update product in database
-      const { error: updateError } = await supabase
+      const updatePayload: any = {
+        name: editForm.name.trim(),
+        price: finalPrice,
+        stock: parseInt(editForm.stock) || 0,
+        category_id: editForm.category_id || null,
+        description: editForm.description.trim() || null,
+        image_url: finalImageUrl,
+        images: finalImages,
+        weight: weightData || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      let { error: updateError } = await supabase
         .from('products')
-        .update({
-          name: editForm.name.trim(),
-          price: finalPrice,
-          stock: parseInt(editForm.stock) || 0,
-          category_id: editForm.category_id || null,
-          description: editForm.description.trim() || null,
-          image_url: finalImageUrl,
-          weight: weightData || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', editingProduct.id);
+
+      if (updateError && (updateError.message?.includes('images') || updateError.code === 'PGRST204')) {
+        const fallbackPayload = { ...updatePayload };
+        delete fallbackPayload.images;
+        const res = await supabase.from('products').update(fallbackPayload).eq('id', editingProduct.id);
+        updateError = res.error;
+      }
 
       if (updateError) throw updateError;
 
@@ -1249,18 +1411,26 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteProduct = async (id: string, imageUrl?: string | null) => {
+  const handleDeleteProduct = async (id: string, prodOrUrl?: Product | string | null) => {
     if (!confirm('Are you sure you want to delete this spice product?')) return;
     try {
+      const prod = typeof prodOrUrl === 'object' && prodOrUrl !== null ? prodOrUrl : products.find((p) => p.id === id);
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
 
-      // Delete image file from storage
-      if (imageUrl) {
-        await deleteOldProductImage(imageUrl);
+      // Delete all image files from storage
+      const imagesToDelete = new Set<string>();
+      if (prod?.images && Array.isArray(prod.images)) {
+        prod.images.forEach((img) => img && imagesToDelete.add(img));
+      }
+      if (prod?.image_url) imagesToDelete.add(prod.image_url);
+      if (typeof prodOrUrl === 'string') imagesToDelete.add(prodOrUrl);
+
+      for (const imgUrl of Array.from(imagesToDelete)) {
+        await deleteOldProductImage(imgUrl);
       }
 
-      toast.success('Product deleted');
+      toast.success('Product and all gallery images deleted');
       fetchProducts();
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['product'] });
@@ -1569,17 +1739,28 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteBanner = async (id: string, title?: string) => {
+  const handleDeleteBanner = async (id: string, title?: string, bannerObj?: HeroBanner) => {
+    const target = bannerObj || banners.find((b) => b.id === id);
     if (!confirm(`Are you sure you want to delete this banner${title ? ` "${title}"` : ''}?`)) return;
     try {
-      await deleteHeroBanner(id);
-      toast.success('Hero banner deleted successfully');
+      if (target?.image_url) {
+        await deleteStorageBannerImage(target.image_url);
+      }
+      if (target?.mobile_image_url) {
+        await deleteStorageBannerImage(target.mobile_image_url);
+      }
+      await deleteHeroBanner(id, {
+        image_url: target?.image_url,
+        mobile_image_url: target?.mobile_image_url,
+      });
+      toast.success('Hero banner and storage images deleted successfully');
       await loadBanners();
       broadcastStoreUpdate('hero_banners_changed');
     } catch (err) {
       toast.error('Failed to delete banner');
     }
   };
+
 
   const handleMoveBanner = async (id: string, direction: 'up' | 'down') => {
     const idx = banners.findIndex((b) => b.id === id);
@@ -1708,12 +1889,21 @@ export default function Admin() {
             reader.readAsDataURL(fileToUpload);
           });
         }
+
+        // Delete previous desktop banner image from Supabase storage if different
+        if (editingBanner.image_url && editingBanner.image_url !== finalImageUrl) {
+          await deleteStorageBannerImage(editingBanner.image_url);
+        }
       }
 
       // Handle mobile image updates
       let finalMobileImageUrl: string | undefined = editBannerForm.remove_mobile_image
         ? undefined
         : (editBannerForm.current_mobile_image_url || undefined);
+
+      if (editBannerForm.remove_mobile_image && editingBanner.mobile_image_url) {
+        await deleteStorageBannerImage(editingBanner.mobile_image_url);
+      }
 
       if (editBannerForm.new_mobile_image_file) {
         try {
@@ -1732,6 +1922,11 @@ export default function Admin() {
           }
           if (!finalMobileImageUrl) {
             finalMobileImageUrl = compMobile.dataUrl;
+          }
+
+          // Delete previous mobile banner image from Supabase storage if different
+          if (editingBanner.mobile_image_url && editingBanner.mobile_image_url !== finalMobileImageUrl) {
+            await deleteStorageBannerImage(editingBanner.mobile_image_url);
           }
         } catch (mobileErr) {
           console.warn('Mobile banner edit upload fallback:', mobileErr);
@@ -2284,18 +2479,63 @@ export default function Admin() {
                   />
                 </div>
 
-                <div>
-                  <Label>Product Image</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-semibold text-sm">Product Images (Gallery)</Label>
+                    <span className="text-xs text-muted-foreground">
+                      {productForm.images.length} {productForm.images.length === 1 ? 'image' : 'images'} selected (First is Cover)
+                    </span>
+                  </div>
+
                   <Input
+                    id="add-product-images-input"
                     type="file"
                     accept="image/*"
-                    onChange={(e) =>
-                      setProductForm({
-                        ...productForm,
-                        image: e.target.files ? e.target.files[0] : null,
-                      })
-                    }
+                    multiple
+                    onChange={handleAddProductImages}
+                    className="cursor-pointer text-xs"
                   />
+
+                  {productForm.imagePreviews.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2">
+                      {productForm.imagePreviews.map((preview, idx) => (
+                        <div
+                          key={idx}
+                          className={`relative group rounded-xl overflow-hidden border-2 bg-secondary/20 aspect-square shadow-sm ${
+                            idx === 0 ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                        >
+                          <img src={preview} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+
+                          {/* Cover Badge */}
+                          {idx === 0 ? (
+                            <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                              Cover
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSetCoverAddProductImage(idx)}
+                              className="absolute top-1 left-1 bg-black/70 hover:bg-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Set as Cover Image"
+                            >
+                              Make Cover
+                            </button>
+                          )}
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAddProductImage(idx)}
+                            className="absolute top-1 right-1 bg-destructive text-destructive-foreground p-1 rounded-full opacity-80 hover:opacity-100 transition-opacity shadow"
+                            title="Remove photo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <Button
@@ -2326,21 +2566,31 @@ export default function Admin() {
                     title="Right-click or click pencil to edit spice details"
                   >
                     <div
-                      className="flex items-center gap-3 overflow-hidden flex-1"
+                      className="flex items-center gap-3 flex-1 min-w-0"
                       onClick={() => handleOpenEditProduct(prod)}
                     >
-                      {prod.image_url ? (
-                        <img
-                          src={prod.image_url}
-                          alt={prod.name}
-                          className="h-12 w-12 rounded-lg object-cover shrink-0 border border-border"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-lg bg-muted border border-border flex items-center justify-center font-bold text-muted-foreground shrink-0">
-                          {prod.name.charAt(0)}
-                        </div>
-                      )}
-                      <div className="truncate">
+                      <div className="relative shrink-0 overflow-visible">
+                        {prod.image_url ? (
+                          <img
+                            src={prod.image_url}
+                            alt={prod.name}
+                            className="h-12 w-12 rounded-lg object-cover border border-border"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-lg bg-muted border border-border flex items-center justify-center font-bold text-muted-foreground">
+                            {prod.name.charAt(0)}
+                          </div>
+                        )}
+                        {prod.images && prod.images.length > 1 && (
+                          <span
+                            className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-card z-10 select-none"
+                            title={`${prod.images.length} gallery photos`}
+                          >
+                            {prod.images.length}
+                          </span>
+                        )}
+                      </div>
+                      <div className="truncate min-w-0 flex-1">
                         <p className="font-semibold text-sm truncate text-foreground group-hover:text-primary transition-colors">
                           {prod.name}
                         </p>
@@ -2355,6 +2605,9 @@ export default function Admin() {
                             return `₹${prod.price}${prod.weight ? ` (${prod.weight})` : ''}`;
                           })()}{' '}
                           | Stock: {prod.stock}
+                          {prod.images && prod.images.length > 1 && (
+                            <span className="ml-1 text-primary font-medium">({prod.images.length} photos)</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -2377,7 +2630,7 @@ export default function Admin() {
                         size="icon"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteProduct(prod.id, prod.image_url);
+                          handleDeleteProduct(prod.id, prod);
                         }}
                         className="h-8 w-8 text-destructive/80 hover:text-destructive hover:bg-destructive/10 transition-colors"
                         title="Delete Spice Product"
@@ -3317,7 +3570,7 @@ export default function Admin() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => handleDeleteBanner(b.id, b.title)}
+                          onClick={() => handleDeleteBanner(b.id, b.title, b)}
                           className="h-8 w-8 text-destructive hover:bg-destructive/10"
                           title="Delete Banner"
                         >
@@ -3703,68 +3956,96 @@ export default function Admin() {
                   />
                 </div>
 
-                {/* Image Upload & Replacement */}
-                <div className="space-y-2 border-t border-border pt-4">
-                  <Label className="text-xs font-semibold block">Spice Product Image</Label>
+                {/* Multi-Image Gallery Management */}
+                <div className="space-y-3 border-t border-border pt-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold block">Spice Gallery Images</Label>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        First image is the main Cover Photo shown in the store catalog.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {editForm.existingImages.length + editForm.newImageFiles.length} total
+                    </span>
+                  </div>
 
-                  <div className="flex items-center gap-4">
-                    {editForm.previewUrl || editForm.currentImageUrl ? (
-                      <div className="relative group shrink-0">
-                        <img
-                          src={editForm.previewUrl || editForm.currentImageUrl || ''}
-                          alt="Product preview"
-                          className="h-20 w-20 rounded-xl object-contain bg-neutral-50 dark:bg-neutral-900 border border-border shadow-sm p-1"
-                        />
-                        {editForm.previewUrl && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold shadow">
-                            New
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="h-20 w-20 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground text-xs font-medium shrink-0">
-                        No image
-                      </div>
-                    )}
+                  {/* Grid of Existing & New Images */}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                    {/* Existing saved images */}
+                    {editForm.existingImages.map((url, idx) => (
+                      <div
+                        key={`existing-${idx}`}
+                        className={`relative group rounded-xl overflow-hidden border-2 bg-secondary/20 aspect-square shadow-sm ${
+                          idx === 0 ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                        }`}
+                      >
+                        <img src={url} alt={`Existing ${idx + 1}`} className="w-full h-full object-cover" />
 
-                    <div className="flex-1 space-y-1.5">
-                      <Input
-                        id="edit-product-image-file"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleEditImageChange}
-                        className="text-xs"
-                      />
-                      {editForm.previewUrl ? (
-                        <div className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="text-primary font-medium truncate max-w-[220px]">
-                            {editForm.imageFile?.name} (
-                            {Math.round((editForm.imageFile?.size || 0) / 1024)} KB)
+                        {/* Cover Badge / Make Cover button */}
+                        {idx === 0 ? (
+                          <span className="absolute top-1 left-1 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                            Cover
                           </span>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditForm((prev) => ({
-                                ...prev,
-                                imageFile: null,
-                                previewUrl: null,
-                              }));
-                              const fileInput = document.getElementById(
-                                'edit-product-image-file'
-                              ) as HTMLInputElement;
-                              if (fileInput) fileInput.value = '';
-                            }}
-                            className="text-destructive hover:underline font-medium shrink-0"
+                            onClick={() => handleSetCoverExistingImage(idx)}
+                            className="absolute top-1 left-1 bg-black/70 hover:bg-primary text-white text-[9px] font-medium px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Set as Cover Image"
                           >
-                            Revert
+                            Make Cover
                           </button>
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground">
-                          Select a new photo to replace current image.
-                        </p>
-                      )}
-                    </div>
+                        )}
+
+                        {/* Remove button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExistingImage(url)}
+                          className="absolute top-1 right-1 bg-destructive text-destructive-foreground p-1 rounded-full opacity-80 hover:opacity-100 transition-opacity shadow"
+                          title="Remove photo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Newly picked images */}
+                    {editForm.newImagePreviews.map((preview, idx) => (
+                      <div
+                        key={`new-${idx}`}
+                        className="relative group rounded-xl overflow-hidden border-2 border-emerald-500/60 bg-secondary/20 aspect-square shadow-sm"
+                      >
+                        <img src={preview} alt={`New upload ${idx + 1}`} className="w-full h-full object-cover" />
+                        <span className="absolute top-1 left-1 bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                          New
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewImage(idx)}
+                          className="absolute top-1 right-1 bg-destructive text-destructive-foreground p-1 rounded-full opacity-80 hover:opacity-100 transition-opacity shadow"
+                          title="Remove photo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add More Photos button & input */}
+                  <div className="pt-1">
+                    <Label htmlFor="edit-add-more-photos" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-primary/40 hover:border-primary text-xs font-semibold text-primary cursor-pointer hover:bg-primary/5 transition-colors">
+                      <Plus className="h-3.5 w-3.5" />
+                      Add More Photos
+                    </Label>
+                    <Input
+                      id="edit-add-more-photos"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleEditAddImageFiles}
+                      className="hidden"
+                    />
                   </div>
                 </div>
 

@@ -184,26 +184,15 @@
     box-shadow: var(--shadow-elevated);
   }
 
-  /* GPU-Accelerated Butter-Smooth Marquee */
-  @keyframes marquee-glide {
-    0% {
-      transform: translate3d(0, 0, 0);
-    }
-    100% {
-      transform: translate3d(-50%, 0, 0);
-    }
+  /* Completely hide scrollbars while preserving scroll functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
-  .animate-marquee-butter {
-    display: flex;
-    width: max-content;
-    will-change: transform;
-    animation: marquee-glide 28s linear infinite;
-  }
-
-  .animate-marquee-butter:hover,
-  .animate-marquee-butter:active,
-  .animate-marquee-butter:focus-within {
-    animation-play-state: paused !important;
+  .no-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
   }
 }

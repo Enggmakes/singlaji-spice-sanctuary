@@ -44,28 +44,37 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
         className="group block bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-card transition-all duration-300"
       >
         {/* Image Container */}
-        <div className="relative aspect-square overflow-hidden bg-secondary/30 flex items-center justify-center p-3">
+        <div className="relative aspect-square overflow-hidden bg-secondary/20 flex items-center justify-center p-3">
+          {/* Ambient Botanical Spice Background */}
+          <div
+            className="absolute inset-0 pointer-events-none bg-cover bg-center transition-transform duration-700 group-hover:scale-110 z-0"
+            style={{
+              backgroundImage: `url('/product_page_mobile.png')`,
+              opacity: 0.22,
+            }}
+          />
+
           {product.image_url ? (
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-contain drop-shadow-sm transition-transform duration-500 group-hover:scale-105"
+              className="relative z-10 w-full h-full object-contain rounded-lg drop-shadow-sm transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            <div className="relative z-10 w-full h-full flex items-center justify-center text-muted-foreground">
               <span className="text-4xl font-serif">{product.name.charAt(0)}</span>
             </div>
           )}
           
           {/* Badges */}
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
+          <div className="absolute top-3 left-3 flex flex-col gap-2 z-20">
             {product.is_featured && (
-              <span className="px-2 py-1 text-xs font-medium bg-accent text-accent-foreground rounded">
+              <span className="px-2 py-1 text-xs font-medium bg-accent text-accent-foreground rounded shadow-sm">
                 Featured
               </span>
             )}
             {discount > 0 && (
-              <span className="px-2 py-1 text-xs font-medium bg-primary text-primary-foreground rounded">
+              <span className="px-2 py-1 text-xs font-medium bg-primary text-primary-foreground rounded shadow-sm">
                 {discount}% OFF
               </span>
             )}
@@ -73,7 +82,7 @@ export default function ProductCard({ product, index = 0 }: ProductCardProps) {
 
           {/* Stock Badge */}
           {product.stock <= 5 && product.stock > 0 && (
-            <span className="absolute top-3 right-3 px-2 py-1 text-xs font-medium bg-destructive/90 text-destructive-foreground rounded">
+            <span className="absolute top-3 right-3 px-2 py-1 text-xs font-medium bg-destructive/90 text-destructive-foreground rounded shadow-sm z-20">
               Only {product.stock} left
             </span>
           )}
